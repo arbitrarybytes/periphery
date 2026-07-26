@@ -18,4 +18,6 @@ module.exports = Object.freeze({
   WARN: 'rgba(255, 176, 32, 0.8)',
   /** Orange for imminent meetings. */
   MEETING: 'rgba(255, 165, 0, 0.8)',
+  /** Violet for coding-agent cues, so agent work is recognisable at a glance. */
+  AGENT: 'rgba(168, 130, 255, 0.85)',
 });

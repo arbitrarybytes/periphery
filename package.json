@@ -5,6 +5,10 @@
   "license": "UNLICENSED",
   "private": true,
   "main": "main.js",
+  "bin": {
+    "periphery": "./cli/periphery.js",
+    "periphery-mcp": "./mcp/server.js"
+  },
   "engines": {
     "node": ">=18.17.0"
   },

@@ -29,11 +29,16 @@ Any process running as your user can still post cues. Treat the endpoint as an "
 
 | Field    | Required | Accepted values |
 | -------- | -------- | --------------- |
-| `cue`    | yes      | `glow`, `glow-bottom`, `glow-pulse`, `comet` |
+| `cue`    | yes      | `glow`, `glow-bottom`, `glow-pulse`, `glow-agent`, `comet` |
 | `color`  | no       | `#rgb` / `#rrggbb` / `#rrggbbaa`, `rgb(...)`, `rgba(...)`, or a colour keyword |
 | `msg`    | no       | Text for the kinetic-typography pill, up to 160 characters |
-| `icon`   | no       | `gitlab`, `outlook`, `calendar`, `pomodoro`, `alert` — bundled icons only, **not** a URL |
+| `icon`   | no       | `gitlab`, `github`, `outlook`, `calendar`, `pomodoro`, `alert`, `agent` — bundled icons only, **not** a URL |
 | `urgent` | no       | `true` to deliver at the highest attention tier: pierces focus mode and skips the typing-pause hold. Use sparingly. |
+
+`glow-agent` is the persistent corner beacon built for coding agents: it stays
+on screen until the user is back at the keyboard, then replays its message
+once. See [agents.md](agents.md) — and prefer the `periphery` CLI or the MCP
+server over hand-rolled requests for that use case.
 
 `GET /health` returns the exact lists the running build accepts.
 
@@ -43,8 +48,8 @@ Responses are `200` on success, `400` for an unknown cue or a malformed body, an
 
 A `200` means the cue was **accepted**, not that it is on screen yet. Webhook cues go through the same attention-aware delivery as every other source:
 
-*   While focus mode is on (Focus Assist, presentation mode, or the tray toggle), non-urgent cues (`glow`, `glow-pulse`, `glow-bottom`) are held and appear only in the summary when focus ends. A `comet` always shows immediately.
-*   While the user is actively typing, non-urgent cues wait for the next typing pause (up to 90 seconds) before appearing.
+*   While focus mode is on (Focus Assist, presentation mode, the tray toggle, or — when enabled — Teams presence), non-urgent cues (`glow`, `glow-pulse`, `glow-bottom`, `glow-agent`) are held and appear only in the summary (and the digest panel) when focus ends. A `comet` always shows immediately.
+*   While the user is actively typing, non-urgent cues wait for the next typing pause (up to 90 seconds) before appearing. `glow-agent` skips this hold — it persists anyway, so there is nothing to time.
 
 If your integration needs a cue to punch through no matter what — a Sev-1 page, a failed deploy gate — send `"cue": "comet"` or add `"urgent": true` to any cue.
 

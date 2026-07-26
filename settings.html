@@ -70,6 +70,47 @@
     </div>
   </div>
 
+  <div class="section">
+    <div class="section-title">Summaries &amp; Agents</div>
+
+    <div class="form-group row">
+      <label for="digestEnabled">End-of-focus digest panel</label>
+      <label class="switch">
+        <input type="checkbox" id="digestEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      When focus ends, an expandable card lists what was held — hover to see
+      each update with its time. Off: you get the one-line summary glow only.
+    </p>
+
+    <div class="form-group row">
+      <label for="awaySummaryEnabled">"While you were away" summary</label>
+      <label class="switch">
+        <input type="checkbox" id="awaySummaryEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      Unlocking after 30+ minutes shows a digest of what arrived while the
+      screen was locked.
+    </p>
+
+    <div class="form-group row">
+      <label for="agentCuesEnabled">Persistent beacon for coding agents</label>
+      <label class="switch">
+        <input type="checkbox" id="agentCuesEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      Agent completions (the <code>glow-agent</code> cue) breathe in the
+      bottom-right corner until you are back at the keyboard, then replay
+      their message once. Off: they render as a normal one-shot glow.
+    </p>
+  </div>
+
   <div class="section" id="windowsSection">
     <div class="section-title">Windows</div>
     <div class="form-group row">
@@ -125,6 +166,34 @@
   </div>
 
   <div class="section">
+    <div class="section-title">GitHub Integration</div>
+    <div class="form-group row">
+      <label for="githubEnabled">Enable GitHub</label>
+      <label class="switch">
+        <input type="checkbox" id="githubEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label for="githubRepo">Repository (owner/name)</label>
+      <input type="text" id="githubRepo" placeholder="e.g. octocat/hello-world">
+    </div>
+    <div class="form-group">
+      <label for="githubPat">Personal Access Token</label>
+      <input type="password" id="githubPat" placeholder="Leave blank to keep existing token">
+      <div class="secret-row">
+        <span class="hint" id="githubPatStatus"></span>
+        <button type="button" class="link" id="clearGithubPat">Remove stored token</button>
+      </div>
+    </div>
+    <p class="hint">
+      Watches Actions runs on the repository plus your notifications (review
+      requests, mentions, assignments). The token needs <code>repo</code> and
+      <code>notifications</code> scopes.
+    </p>
+  </div>
+
+  <div class="section">
     <div class="section-title">Outlook Integration</div>
     <div class="form-group row">
       <label for="outlookEnabled">Enable Outlook</label>
@@ -145,6 +214,20 @@
         <button type="button" class="link" id="clearOutlookToken">Remove stored token</button>
       </div>
     </div>
+
+    <div class="form-group row">
+      <label for="teamsPresenceEnabled">Hold cues while busy in Teams</label>
+      <label class="switch">
+        <input type="checkbox" id="teamsPresenceEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      Polls your Teams presence through Microsoft Graph: in a call, presenting,
+      or Do Not Disturb (including Focusing) holds ambient cues like focus mode
+      does. Uses the Graph token above, which then also needs the
+      <code>Presence.Read</code> scope.
+    </p>
   </div>
 
   <div class="footer">

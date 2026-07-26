@@ -29,6 +29,14 @@ module.exports = [
     },
   },
   {
+    // The static landing page runs in a plain browser, not Node.
+    files: ['website/**/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: { ...globals.browser },
+    },
+  },
+  {
     // Preloads run in Electron's bridged context: Node require + browser window.
     files: ['preload.js', 'preload-settings.js'],
     languageOptions: {
