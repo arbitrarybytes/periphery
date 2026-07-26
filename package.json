@@ -1,9 +1,14 @@
 {
-  "name": "periphery-poc",
-  "version": "1.0.0",
-  "description": "Proof of concept for Periphery desktop notifications",
+  "name": "periphery",
+  "version": "1.0.0-beta.1",
+  "description": "Periphery — local-first ambient notifications for deep work. Node edition (Electron).",
   "license": "UNLICENSED",
   "private": true,
+  "homepage": "https://github.com/arbitrarybytes/periphery",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arbitrarybytes/periphery.git"
+  },
   "main": "main.js",
   "bin": {
     "periphery": "./cli/periphery.js",
@@ -17,21 +22,30 @@
     "test": "node --test",
     "lint": "eslint .",
     "dist": "electron-builder --win",
-    "dist:msix": "electron-builder --win appx"
+    "dist:msix": "electron-builder --win appx",
+    "tauri": "tauri",
+    "assets": "electron scripts/build-assets.js",
+    "notify:success": "curl -s -X POST http://127.0.0.1:49123/notify -H \"Content-Type: application/json\" -d \"{\\\"cue\\\":\\\"glow-pulse\\\", \\\"color\\\":\\\"rgba(0, 255, 100, 0.8)\\\", \\\"msg\\\":\\\"Build succeeded\\\"}\"",
+    "notify:fail": "curl -s -X POST http://127.0.0.1:49123/notify -H \"Content-Type: application/json\" -d \"{\\\"cue\\\":\\\"glow-bottom\\\", \\\"color\\\":\\\"rgba(255, 0, 50, 0.8)\\\", \\\"msg\\\":\\\"Build failed\\\", \\\"icon\\\":\\\"alert\\\"}\""
   },
   "build": {
     "appId": "com.periphery.app",
     "productName": "Periphery",
+    "artifactName": "${productName}-${version}-node-setup.${ext}",
     "files": [
       "**/*",
       "!website/**",
       "!docs/**",
+      "!ai-native/**",
+      "!scripts/**",
+      "!src-tauri/**",
       "!test/**",
       "!dist/**",
       "!.github/**",
       "!*.md"
     ],
     "win": {
+      "icon": "build/icon.png",
       "target": [
         "nsis"
       ]
@@ -52,6 +66,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2.11.4",
     "electron": "^31.3.1",
     "electron-builder": "^26.15.3",
     "eslint": "^10.8.0",

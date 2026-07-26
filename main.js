@@ -920,7 +920,9 @@ function applyLoginItemSetting() {
 function main() {
   // A stable AppUserModelID keeps the tray identity and any future toasts
   // grouped under one app on Windows instead of under "electron.app".
-  if (IS_WINDOWS) app.setAppUserModelId('com.periphery.poc');
+  // Must match build.appId, or the taskbar treats the installed app and the
+  // running process as two different applications.
+  if (IS_WINDOWS) app.setAppUserModelId('com.periphery.app');
 
   app.whenReady().then(() => {
     refreshAccent();

@@ -1,7 +1,7 @@
 # Periphery: Unobtrusive Desktop Notification System
 ## Product Specification
 
-> **Status (2026-07-26):** This is the product vision. Items marked ✅ are implemented in the current PoC; items marked 🔭 are planned but not yet built. Where the vision and the code differ (notably the tech stack), the divergence is recorded in [ADR.md](ADR.md).
+> **Status (2026-07-26) — v1.0.0-beta.1:** This is the product vision. Items marked ✅ are implemented and shipping; ◐ is partial; 🔭 is planned but not yet built. The product is past proof of concept and in public beta, shipping as two editions of one product — see [versioning.md](versioning.md). Where the vision and the code differ, the divergence is recorded in [ADR.md](ADR.md).
 
 ### 1. Vision & Core Philosophy
 Periphery is a desktop notification layer designed to keep professionals informed without breaking their deep work state (flow). Moving beyond standard OS toast notifications—which are often jarring, anxiety-inducing, and demand immediate attention—Periphery utilizes subtle, delightful, and ambient visual/audio cues. 
@@ -13,7 +13,7 @@ To satisfy strict enterprise security requirements:
 *   ✅ **No Cloud Backend:** There is no central server processing events. 
 *   ✅ **Direct Polling via PATs:** For cloud services (GitLab and GitHub), users provide Personal Access Tokens. The local app polls these APIs directly. Data flows strictly from the third-party service directly to the user's local machine. Tokens are encrypted with the OS credential store via Electron `safeStorage` and persisted as ciphertext in the app's user-data directory (not as individual OS Keychain entries — see README "Encrypted Secret Storage").
 *   ✅ **Local Webhook Receiver:** The app runs a lightweight, loopback-only HTTP server (`127.0.0.1:49123`) that local scripts and tools can send POST requests to. See [webhooks.md](webhooks.md).
-*   🔭 **Tech Stack:** The production target is Tauri (Rust backend) for a minimal memory footprint. The current PoC is deliberately built on Electron; see [ADR 1](ADR.md) for the decision and the portability constraints it imposes (connectors and validation stay Electron-free).
+*   ◐ **Tech Stack:** The production target is Tauri (Rust backend) for a minimal memory footprint, and the migration is underway — the logic core, stores (DPAPI direct), and webhook receiver are ported and tested; the shell and connectors are not. Electron remains the stable edition until the parity checklist in [versioning.md](versioning.md) is complete. See [ADR 4](ADR.md) for the decision and [ADR 1](ADR.md) for the original Electron rationale it supersedes.
 
 ### 3. Notification Mechanisms (The "Cues")
 Moving beyond the original "flying bird" experiment, the system offers a diverse marketplace of unobtrusive cues that grasp focus gently:

@@ -1,4 +1,22 @@
-# <img src="ui/assets/icon.svg" width="28" alt="" align="top"> Periphery
+<p align="center">
+  <img src="docs/assets/logo-256.webp" width="128" alt="Periphery" />
+</p>
+
+<h1 align="center">Periphery</h1>
+
+<p align="center">
+  <strong>Signal at the edge of attention.</strong><br />
+  <a href="https://arbitrarybytes.github.io/periphery/">Website</a> ·
+  <a href="ai-native/getting-started.md">Getting started</a> ·
+  <a href="ai-native/versioning.md">Versioning</a> ·
+  <a href="https://buymeacoffee.com/arbitrarybytes">Buy me a coffee</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0--beta.1-38c5ff" alt="v1.0.0-beta.1" />
+  <img src="https://img.shields.io/badge/Node%20edition-stable-38c5ff" alt="Node edition: stable" />
+  <img src="https://img.shields.io/badge/Rust%20edition-preview-c77dff" alt="Rust edition: preview" />
+</p>
 
 **Periphery** is a local-first, unobtrusive notification system designed specifically for deep-work professionals and enterprise developers.
 
@@ -120,7 +138,17 @@ install when you quit — never a popup. Both behaviours are Settings toggles
 a certificate is configured; the decision and trade-offs are recorded in
 [ADR 3](ai-native/ADR.md).
 
-## Running the PoC
+## Running it
+
+Periphery is in public beta (`v1.0.0-beta.1`) and ships as **two editions of one
+product** — the Node edition on Electron (stable, feature-complete) and the Rust
+edition on Tauri (preview). Both answer the same webhook, CLI, and MCP contract
+on `127.0.0.1:49123`, so hooks written today keep working when the editions
+swap. Install both if you like; run one at a time. The numbering rules,
+promotion checklist, and co-existence constraints are in
+[ai-native/versioning.md](ai-native/versioning.md).
+
+### Node edition (stable)
 
 ```bash
 # Install dependencies
@@ -135,6 +163,44 @@ npm run lint
 ```
 
 Both also run in CI (`.github/workflows/ci.yml`) on a Windows runner.
+
+### Rust edition (preview)
+
+Needs the [Rust toolchain](https://rustup.rs) plus the MSVC C++ build tools —
+`cargo` cannot link without them, even for `cargo check`.
+
+```bash
+cd src-tauri
+cargo test          # logic core, stores, webhook, delivery, tray
+cargo clippy --all-targets
+
+cd ..
+npm run tauri dev   # run the shell
+```
+
+The shell draws cues today: transparent click-through overlays, the tray, the
+loopback receiver, and the full delivery pipeline. Connectors and the Settings
+frontend are not wired yet — see the checklist in
+[ai-native/versioning.md](ai-native/versioning.md) for exactly what is and is
+not done.
+
+Two environment variables help when the overlay misbehaves, since a
+click-through window cannot be right-clicked to open devtools:
+
+| Variable | Effect |
+| --- | --- |
+| `PERIPHERY_DEVTOOLS=1` | Opens devtools on the first overlay |
+| `PERIPHERY_SELFTEST=1` | Paints a marker into the overlay, separating "the webview is not painting" from "the cue never arrived" |
+
+### Regenerating image assets
+
+`build/logo.png` (app icon) and `ui/assets/icon.svg` (tray mark) are the only
+hand-authored images; everything else is derived:
+
+```bash
+npm run assets                                   # sizes, WebP, favicons, social card
+npx tauri icon build/icon.png -o src-tauri/icons # bundle icons
+```
 
 *Note: The application is designed to be invisible until a cue is triggered.* Reach Settings from the Periphery tray icon — on Windows it may start in the tray overflow menu (the `^` chevron).
 

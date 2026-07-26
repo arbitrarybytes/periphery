@@ -6,7 +6,11 @@ const {
   sanitizeCuePayload, sanitizeResolvePayload, CUE_NAMES, STATE_CUES, ICON_NAMES,
 } = require('../utils/cuePayload');
 
+const { version } = require('../package.json');
+
 const DEFAULT_PORT = 49123;
+/** Which shell is answering. See ai-native/versioning.md. */
+const EDITION = 'node';
 /** Loopback only. Never widen this: the receiver is unauthenticated by design. */
 const HOST = '127.0.0.1';
 const BODY_LIMIT = '8kb';
@@ -69,7 +73,14 @@ function createWebhookApp({ onCue, onResolve }) {
 
   app.get('/health', (req, res) => {
     res.json({
-      success: true, cues: CUE_NAMES, stateCues: STATE_CUES, icons: ICON_NAMES,
+      success: true,
+      // Both editions answer on the same port and behave alike, so a client,
+      // hook, or bug report needs a way to say which one replied.
+      version,
+      edition: EDITION,
+      cues: CUE_NAMES,
+      stateCues: STATE_CUES,
+      icons: ICON_NAMES,
     });
   });
 
@@ -146,4 +157,6 @@ function startWebhookServer({ onCue, onResolve, port = DEFAULT_PORT, onError }) 
   return server;
 }
 
-module.exports = { startWebhookServer, DEFAULT_PORT, HOST };
+module.exports = {
+  startWebhookServer, DEFAULT_PORT, HOST, EDITION,
+};

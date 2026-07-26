@@ -56,6 +56,28 @@
   );
   document.querySelectorAll(".reveal").forEach((el) => revealObserver.observe(el));
 
+  /*
+   * Safety net. The observer only reports threshold *crossings*, so anything
+   * the viewport skips past before its first callback lands never gets marked
+   * and stays at opacity 0 forever — a whole section rendering blank. That
+   * happens on a jump to an anchor, on a fast flick to the bottom, and on a
+   * restored scroll position after reload. This sweeps whatever is actually on
+   * screen and reveals it, which the observer alone cannot guarantee.
+   */
+  const revealVisible = () => {
+    for (const el of document.querySelectorAll(".reveal:not(.in)")) {
+      const box = el.getBoundingClientRect();
+      if (box.top < innerHeight * 0.94 && box.bottom > 0) {
+        el.classList.add("in");
+        revealObserver.unobserve(el);
+      }
+    }
+  };
+  addEventListener("scroll", revealVisible, { passive: true });
+  addEventListener("resize", revealVisible);
+  addEventListener("load", revealVisible);
+  revealVisible();
+
   /* ---------------- Cue engine ---------------- */
 
   function edgeGlow(color, { duration = 2600, spread = 130 } = {}) {

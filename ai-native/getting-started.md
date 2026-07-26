@@ -57,7 +57,7 @@ Tray icon → **Settings** → **Outlook Integration**:
 | ----- | ----- |
 | Enable Outlook | on |
 | User Email Address | the address from `userPrincipalName`, e.g. `you@outlook.com` |
-| Microsoft Graph Token (For PoC) | paste the token |
+| Microsoft Graph Token | paste the token |
 
 Click **Save Settings**. The status line under the token box should change to
 "A token is stored." Periphery runs a silent **baseline fetch** on start, so

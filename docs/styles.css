@@ -15,6 +15,8 @@
   --faint: #5b6578;
   --signal: #38c5ff;
   --accent: #0067c0;
+  /* Carried over from the app logo, so the mark and the page share an identity. */
+  --violet: #c77dff;
   --t1: #ff9e64;
   --t2: #38c5ff;
   --t3: #6ee7c8;
@@ -201,11 +203,44 @@ img { max-width: 100%; }
   50% { opacity: 1; }
 }
 
+.version-pill {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+  border: 1px solid var(--line-bright);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+  /* Sits with the wordmark, not on its baseline. */
+  align-self: center;
+  margin-left: 0.15rem;
+}
+
 .nav-links {
   display: flex;
   gap: 1.7rem;
   margin-left: auto;
 }
+
+.nav-end {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.nav-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  color: var(--dim);
+  transition: color 0.25s, background 0.25s;
+}
+
+.nav-icon:hover { color: var(--ink); background: rgba(151, 173, 208, 0.09); }
+.nav-coffee:hover { color: #ffc46b; background: rgba(255, 196, 107, 0.1); }
 
 .nav-links a {
   font-family: var(--font-mono);
@@ -251,7 +286,49 @@ main { position: relative; z-index: 1; }
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 7rem clamp(1.2rem, 5vw, 3rem) 4rem;
+  padding: 5.6rem clamp(1.2rem, 5vw, 3rem) 4rem;
+}
+
+/* The logo, at a size where its detail survives. Below ~64px this artwork
+   collapses into a dark plate, which is why the nav and favicon use the ring
+   mark instead. */
+.hero-mark {
+  position: relative;
+  /* Kept deliberately tight: the mark must not push the primary CTA below the
+     fold on a 900px-tall viewport. */
+  margin-bottom: 1.3rem;
+  line-height: 0;
+}
+
+.hero-mark img {
+  width: clamp(76px, 8.5vw, 104px);
+  height: auto;
+  border-radius: 26%;
+  position: relative;
+  z-index: 1;
+  animation: markRise 1.1s var(--ease-out) both;
+}
+
+/* The glow the plate would cast if it were really lit. */
+.hero-mark::after {
+  content: "";
+  position: absolute;
+  inset: -46%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(199, 125, 255, 0.28), rgba(56, 197, 255, 0.12) 45%, transparent 70%);
+  filter: blur(22px);
+  animation: markBreathe 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes markRise {
+  from { opacity: 0; transform: translateY(14px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes markBreathe {
+  0%, 100% { opacity: 0.65; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.04); }
 }
 
 .eyebrow {
@@ -271,7 +348,7 @@ main { position: relative; z-index: 1; }
   font-weight: 340;
   line-height: 0.98;
   letter-spacing: -0.015em;
-  margin-bottom: 2.1rem;
+  margin-bottom: 1.7rem;
 }
 
 .hero-title em,
@@ -289,7 +366,7 @@ main { position: relative; z-index: 1; }
   max-width: 42rem;
   font-size: clamp(1.02rem, 1.4vw, 1.16rem);
   color: var(--dim);
-  margin-bottom: 2.6rem;
+  margin-bottom: 2.1rem;
 }
 
 .hero-actions {
@@ -1184,6 +1261,74 @@ main { position: relative; z-index: 1; }
   text-align: left;
 }
 
+/* Two shells, one product — see ai-native/versioning.md. */
+.edition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.1rem;
+  max-width: 720px;
+  margin: 2.6rem auto 1.2rem;
+  text-align: left;
+}
+
+.edition-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.5rem 1.6rem;
+  background: linear-gradient(160deg, rgba(151, 173, 208, 0.05), transparent 70%);
+}
+
+.edition-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  margin-bottom: 0.5rem;
+}
+
+.edition-tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 0.7rem;
+}
+
+.edition-tag span {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.is-stable { border-color: var(--line-bright); }
+.is-stable .edition-tag span { color: var(--signal); }
+.is-preview .edition-tag span { color: var(--violet); }
+
+.edition-desc { font-size: 0.94rem; color: var(--dim); line-height: 1.6; }
+
+.edition-note {
+  max-width: 620px;
+  margin: 0 auto 2.4rem;
+  font-size: 0.92rem;
+  color: var(--faint);
+}
+
+.outro-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2.4rem;
+}
+
+.btn-coffee {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.btn-coffee:hover { border-color: rgba(255, 196, 107, 0.4); background: rgba(255, 196, 107, 0.07); color: #ffc46b; }
+
 .footer {
   border-top: 1px solid var(--line);
   padding: 2.6rem clamp(1.2rem, 5vw, 3rem);
@@ -1203,6 +1348,25 @@ main { position: relative; z-index: 1; }
   font-size: 1.02rem;
   color: #a8b6cc;
 }
+
+.footer-links {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.footer-links a {
+  text-decoration: none;
+  color: var(--dim);
+  transition: color 0.25s;
+}
+
+.footer-links a:hover { color: var(--signal); }
 
 .footer-note {
   font-size: 0.72rem;
@@ -1232,6 +1396,8 @@ main { position: relative; z-index: 1; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .const-star { animation: none; }
   .tide-pill { animation: none; }
+  .hero-mark img { animation: none; }
+  .hero-mark::after { animation: none; opacity: 0.8; }
 }
 
 @media (max-width: 920px) {
@@ -1245,7 +1411,11 @@ main { position: relative; z-index: 1; }
   body { font-size: 16px; }
   .nav { gap: 1rem; }
   .nav-links { display: none; }
-  .nav-cta { margin-left: auto; }
+  .nav-end { margin-left: auto; gap: 0.35rem; }
+  /* The wordmark plus a version pill plus three controls will not fit; the
+     pill is the least useful of them on a phone. */
+  .version-pill { display: none; }
+  .nav-cta { padding: 0.45rem 0.85rem; }
   .privacy-grid, .win-grid { grid-template-columns: 1fr; }
   .hero { padding-top: 6rem; }
   .focus-strip { flex-direction: column; }

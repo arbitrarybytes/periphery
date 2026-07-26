@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;">
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+                 connect-src ipc: http://ipc.localhost;">
   <title>Periphery Settings</title>
   <link rel="stylesheet" href="settings.css">
 </head>
@@ -240,7 +241,7 @@
       <input type="text" id="outlookEmail" placeholder="you@example.com">
     </div>
     <div class="form-group">
-      <label for="outlookToken">Microsoft Graph Token (For PoC)</label>
+      <label for="outlookToken">Microsoft Graph Token</label>
       <input type="password" id="outlookToken" placeholder="Leave blank to keep existing token">
       <div class="secret-row">
         <span class="hint" id="outlookTokenStatus"></span>
