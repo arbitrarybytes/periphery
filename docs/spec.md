@@ -4,7 +4,7 @@
 > **Status (2026-07-26):** This is the product vision. Items marked ✅ are implemented in the current PoC; items marked 🔭 are planned but not yet built. Where the vision and the code differ (notably the tech stack), the divergence is recorded in [ADR.md](ADR.md).
 
 ### 1. Vision & Core Philosophy
-Periphery (formerly FlowState) is a desktop notification layer designed to keep professionals informed without breaking their deep work state (flow). Moving beyond standard OS toast notifications—which are often jarring, anxiety-inducing, and demand immediate attention—Periphery utilizes subtle, delightful, and ambient visual/audio cues. 
+Periphery is a desktop notification layer designed to keep professionals informed without breaking their deep work state (flow). Moving beyond standard OS toast notifications—which are often jarring, anxiety-inducing, and demand immediate attention—Periphery utilizes subtle, delightful, and ambient visual/audio cues. 
 
 **Crucially, Periphery is an enterprise-ready, local-first application.** No user data, calendar events, or proprietary code ever leaves the local machine. It acts as a local broker between your tasks and your screen.
 
@@ -53,3 +53,9 @@ The application window is a control center strictly for configuring rules, rathe
 1.  ✅ **Phase 1 (Proof of Concept):** Build the local hook (webhook receiver) and the core visual cues (Edge Glow variants and The Comet) to validate the unobtrusive nature of the notifications.
 2.  ✅ **Phase 2 (Connectors):** Implement the local polling engine using PATs — delivered for GitLab and Outlook (GitHub 🔭), on a connector abstraction that never imports Electron.
 3.  ◐ **Phase 3 (Settings UI):** Build the GUI for configuring connections and cues — basic settings window shipped; the rules engine, connector store, and cue wardrobe remain 🔭.
+
+Directions beyond Phase 3 are collected in [vnext.md](vnext.md).
+
+### 7. Associated Artifacts
+*   ✅ **Landing page** (`website/`): a static, dependency-free site (plain HTML/CSS/JS, no build step) that presents the core tenets and *demonstrates* the cues in-browser — the page renders a live comet, edge glow, and bottom glow, plus looping Slack Tide and Constellation demos. It honors `prefers-reduced-motion` with the same stationary-fade degradation the app uses. Note: the site loads webfonts and icons8 icons from CDNs; the "no network assets" guarantee applies to the app overlay, not the marketing site.
+*   ✅ **CI** (`.github/workflows/ci.yml`): runs `npm test` and `npm run lint` on a Windows runner.

@@ -31,6 +31,7 @@ utils/trayBadge.js       Accent badge-dot compositing for the tray icon
 utils/stores/            Config + encrypted secret persistence
 preload*.js              contextBridge APIs
 renderer.js, styles.css  The overlay itself
+website/                 Static landing page (plain HTML/CSS/JS; not part of the app)
 ```
 
 ### The Connector Engine
@@ -89,5 +90,13 @@ Invoke-RestMethod -Uri http://127.0.0.1:49123/notify -Method POST -Body '{"cue":
 
 `GET /health` returns the cue and icon names the running build accepts.
 
+## The Landing Page
+
+[`website/`](website/) holds a static landing page that presents Periphery's tenets and demonstrates the cues live in the browser — the page itself fires a comet, edge glows, and bottom glows, and runs looping Slack Tide / Constellation demos. Open `website/index.html` directly; there is no build step. It honors `prefers-reduced-motion` the same way the app does. (Unlike the app overlay, the site does load webfonts and [icons8](https://icons8.com) icons from CDNs.)
+
 ## Integrating Your Tools
 To learn how to integrate your existing local tools (Git, npm, CI/CD) using the Local Webhook, please read the [Webhook Integration Guide](docs/webhooks.md).
+
+## Where Periphery Goes Next
+
+Proposed vNext directions — new delivery channels, connectors, and friction removal — are collected in [docs/vnext.md](docs/vnext.md).

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Periphery — Signal at the edge of attention</title>
+  <meta name="description" content="Periphery is a local-first, ambient notification system for deep-work professionals. No popups, no sounds, no cloud — just quiet, cinematic light at the edge of your screen." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cmask id='g'%3E%3Crect width='100' height='100' fill='%23fff'/%3E%3Ccircle cx='71.2' cy='28.8' r='20' fill='%23000'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='30' fill='none' stroke='%23a8b6cc' stroke-width='15' mask='url(%23g)'/%3E%3Ccircle cx='71.2' cy='28.8' r='14' fill='%2338c5ff'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Instrument+Sans:ital,wght@0,400..600;1,400..600&family=Spline+Sans+Mono:wght@300..500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ======= Ambient stage: stars, grain, and the live cue overlay ======= -->
+  <div class="starfield" id="starfield" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cue-stage" id="cueStage" aria-hidden="true"></div>
+
+  <!-- ======= Nav ======= -->
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="#top" aria-label="Periphery home">
+      <svg class="brand-mark" viewBox="0 0 100 100" width="26" height="26" role="img" aria-hidden="true">
+        <defs><mask id="brandGap"><rect width="100" height="100" fill="#fff"/><circle cx="71.2" cy="28.8" r="20" fill="#000"/></mask></defs>
+        <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" stroke-width="15" mask="url(#brandGap)"/>
+        <circle class="brand-dot" cx="71.2" cy="28.8" r="14" fill="#38c5ff"/>
+      </svg>
+      <span>Periphery</span>
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#hierarchy">Hierarchy</a>
+      <a href="#delivery">Delivery</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#connectors">Connectors</a>
+    </nav>
+    <a class="nav-cta" href="#run">Run the PoC</a>
+  </header>
+
+  <main id="top">
+
+    <!-- ======= Hero ======= -->
+    <section class="hero">
+      <p class="eyebrow reveal">Local-first ambient notifications &mdash; for deep work</p>
+      <h1 class="hero-title reveal" style="--d:.08s">
+        Built to be<br /><em>ignored.</em>
+      </h1>
+      <p class="hero-sub reveal" style="--d:.16s">
+        Every chat app is engineered to steal your attention. Periphery is engineered to
+        protect it &mdash; replacing popups and pings with quiet, cinematic light at the
+        edge of your screen. You notice what matters, exactly when it matters. Nothing else, ever.
+      </p>
+      <div class="hero-actions reveal" style="--d:.24s">
+        <button class="btn btn-primary" id="heroDemo" type="button">See it in your periphery</button>
+        <a class="btn btn-ghost" href="#hierarchy">How the light works</a>
+      </div>
+      <p class="hero-hint reveal" style="--d:.32s"><span class="hint-dot" aria-hidden="true"></span>This page is the demo. Watch the edges of your screen.</p>
+    </section>
+
+    <!-- ======= Creed marquee ======= -->
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span>No cloud backend</span><i>&#10022;</i>
+        <span>No telemetry</span><i>&#10022;</i>
+        <span>No sounds</span><i>&#10022;</i>
+        <span>No popups</span><i>&#10022;</i>
+        <span>No focus stealing</span><i>&#10022;</i>
+        <span>No third-party brokers</span><i>&#10022;</i>
+        <span>127.0.0.1 only</span><i>&#10022;</i>
+        <span>No cloud backend</span><i>&#10022;</i>
+        <span>No telemetry</span><i>&#10022;</i>
+        <span>No sounds</span><i>&#10022;</i>
+        <span>No popups</span><i>&#10022;</i>
+        <span>No focus stealing</span><i>&#10022;</i>
+        <span>No third-party brokers</span><i>&#10022;</i>
+        <span>127.0.0.1 only</span><i>&#10022;</i>
+      </div>
+    </div>
+
+    <!-- ======= 01 · Attention Hierarchy ======= -->
+    <section class="section" id="hierarchy">
+      <p class="section-no reveal">01 &mdash; The Attention Hierarchy</p>
+      <h2 class="section-title reveal" style="--d:.06s">Three tiers of light.<br /><em>Zero interruptions.</em></h2>
+      <p class="section-lede reveal" style="--d:.12s">
+        Periphery maps the urgency of every event to a visual cue drawn on a transparent,
+        click-through canvas over your screen. Nothing steals focus. Nothing makes a sound.
+        Press a trigger below and watch it happen &mdash; right here, on this page.
+      </p>
+
+      <div class="tier-grid">
+        <article class="tier-card tier-1 reveal" style="--d:.1s">
+          <p class="tier-tag">Tier 1 &middot; Break flow</p>
+          <h3>The Comet</h3>
+          <p class="tier-desc">A single bright streak across your screen with a fast pulse. Reserved
+            for the rare things that genuinely outrank your flow.</p>
+          <p class="tier-examples">Direct manager DMs &middot; Sev-1 incidents</p>
+          <button class="tier-trigger" type="button" data-cue="comet">
+            <span class="trigger-ring" aria-hidden="true"></span>Trigger comet
+          </button>
+        </article>
+
+        <article class="tier-card tier-2 reveal" style="--d:.2s">
+          <p class="tier-tag">Tier 2 &middot; Awareness</p>
+          <h3>The Edge Glow</h3>
+          <p class="tier-desc">A subtle breath of light along the edge of the display. Enough
+            to register a context shift, never enough to break a thought.</p>
+          <p class="tier-examples">CI/CD pipeline failures &middot; Upcoming meetings</p>
+          <button class="tier-trigger" type="button" data-cue="edge">
+            <span class="trigger-ring" aria-hidden="true"></span>Trigger edge glow
+          </button>
+        </article>
+
+        <article class="tier-card tier-3 reveal" style="--d:.3s">
+          <p class="tier-tag">Tier 3 &middot; Ambient</p>
+          <h3>The Bottom Glow</h3>
+          <p class="tier-desc">A slow warmth rising from the bottom of the screen, like a
+            horizon. Background state you absorb without ever looking at it.</p>
+          <p class="tier-examples">Pomodoro breaks &middot; CC&rsquo;d email</p>
+          <button class="tier-trigger" type="button" data-cue="bottom">
+            <span class="trigger-ring" aria-hidden="true"></span>Trigger bottom glow
+          </button>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======= 02 · Attention-aware delivery ======= -->
+    <section class="section" id="delivery">
+      <p class="section-no reveal">02 &mdash; Attention-aware delivery</p>
+      <h2 class="section-title reveal" style="--d:.06s">It doesn&rsquo;t just look quiet.<br /><em>It waits for you.</em></h2>
+      <p class="section-lede reveal" style="--d:.12s">
+        Beyond <em>how</em> a cue looks, Periphery decides <em>when</em> it deserves your eyes.
+        Every cue passes through the same gauntlet: focus hold &rarr; slack tide &rarr; immediate.
+        Only Tier&nbsp;1 cues and meeting reminders go straight through.
+      </p>
+
+      <div class="delivery-grid">
+        <!-- Slack Tide -->
+        <article class="feature-panel reveal" style="--d:.1s">
+          <div class="feature-head">
+            <img src="https://img.icons8.com/ios/100/38c5ff/keyboard.png" alt="" width="26" height="26" />
+            <h3>Slack Tide</h3>
+          </div>
+          <p>While you&rsquo;re mid-keystroke-burst, non-urgent cues are held and released in your
+            next natural micro-pause &mdash; about six seconds without input. Pills never pile up,
+            nothing is held longer than 90 seconds, and a flood collapses into a single
+            <span class="mono-chip">+N more</span>. No keylogging: just the OS idle timer.</p>
+          <div class="demo-screen" id="tideDemo" aria-label="Animated demonstration of Slack Tide holding cues during typing and releasing them in a pause">
+            <div class="demo-titlebar"><i></i><i></i><i></i><span>you, mid-flow</span></div>
+            <p class="demo-typing mono"><span id="tideTyped"></span><span class="caret" id="tideCaret"></span></p>
+            <div class="tide-held mono" id="tideHeld"></div>
+            <p class="demo-status mono" id="tideStatus">&nbsp;</p>
+            <div class="tide-pills" id="tidePills"></div>
+          </div>
+        </article>
+
+        <!-- Constellation -->
+        <article class="feature-panel reveal" style="--d:.2s">
+          <div class="feature-head">
+            <img src="https://img.icons8.com/ios/100/38c5ff/star.png" alt="" width="26" height="26" />
+            <h3>The Constellation</h3>
+          </div>
+          <p>Cues held during focus don&rsquo;t vanish into a counter. Each leaves a dim,
+            twinkling star near the corner of your screen. A glance tells you <em>how much</em>
+            happened &mdash; without telling you <em>what</em>, which is exactly the information
+            that breaks flow. When focus ends, the stars dissolve into one quiet summary.</p>
+          <div class="demo-screen" id="constDemo" aria-label="Animated demonstration of held cues appearing as stars, then resolving to a summary when focus ends">
+            <div class="demo-titlebar"><i></i><i></i><i></i><span id="constLabel">focus mode &middot; 24:51</span></div>
+            <div class="const-sky" id="constSky"></div>
+            <p class="const-summary mono" id="constSummary">5 updates &mdash; gitlab 3 &middot; outlook 2</p>
+          </div>
+        </article>
+      </div>
+
+      <div class="focus-strip reveal" style="--d:.1s">
+        <img src="https://img.icons8.com/ios/100/6ee7c8/do-not-disturb.png" alt="" width="30" height="30" />
+        <div>
+          <h4>Focus Assist, actually respected</h4>
+          <p>While Windows would suppress toasts &mdash; Focus Assist, presentation mode, a
+            full-screen app &mdash; Periphery holds everything but Tier&nbsp;1 and meeting
+            reminders, then flushes one quiet summary glow when focus ends. Your DND setting
+            finally means what it says.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= 03 · Privacy ======= -->
+    <section class="section" id="privacy">
+      <p class="section-no reveal">03 &mdash; Privacy &amp; security</p>
+      <h2 class="section-title reveal" style="--d:.06s">Private by architecture.<br /><em>Not by policy.</em></h2>
+      <p class="section-lede reveal" style="--d:.12s">
+        Periphery was built for strict enterprise environments where data exfiltration and
+        cloud dependencies are unacceptable. There is no privacy setting to trust &mdash;
+        there is simply nowhere for your data to go.
+      </p>
+
+      <div class="privacy-grid">
+        <article class="privacy-card reveal" style="--d:.08s">
+          <img src="https://img.icons8.com/ios/100/38c5ff/cloud-cross.png" alt="" width="34" height="34" />
+          <h3>No cloud backend</h3>
+          <p>No central server. No telemetry. The only outbound requests are the ones you
+            configure &mdash; straight to GitLab and Microsoft Graph, from your machine. The
+            overlay never loads a single byte from the network.</p>
+        </article>
+        <article class="privacy-card reveal" style="--d:.16s">
+          <img src="https://img.icons8.com/ios/100/38c5ff/lock--v1.png" alt="" width="34" height="34" />
+          <h3>Encrypted secret storage</h3>
+          <p>Tokens are encrypted with your OS credential store and only ciphertext touches
+            disk. No preload bridge can read a secret back out.</p>
+          <p class="mono-detail">safeStorage &rarr; DPAPI &middot; Keychain &middot; libsecret</p>
+        </article>
+        <article class="privacy-card reveal" style="--d:.24s">
+          <img src="https://img.icons8.com/ios/100/38c5ff/shield.png" alt="" width="34" height="34" />
+          <h3>Loopback-only webhook</h3>
+          <p>The local cue receiver binds to loopback and is unreachable from the network,
+            with allowlist validation on every untrusted payload.</p>
+          <p class="mono-detail">bind 127.0.0.1:49123 &middot; cuePayload allowlist</p>
+        </article>
+        <article class="privacy-card reveal" style="--d:.32s">
+          <img src="https://img.icons8.com/ios/100/38c5ff/firewall.png" alt="" width="34" height="34" />
+          <h3>No third-party brokers</h3>
+          <p>Integrations run locally, so there&rsquo;s no Zapier, no Make.com, no automation
+            middleman holding your credentials on the wrong side of the corporate firewall.</p>
+        </article>
+      </div>
+      <p class="privacy-foot mono reveal">Renderers run sandboxed &middot; context isolation &middot; restrictive CSP &middot; narrow contextBridge APIs</p>
+    </section>
+
+    <!-- ======= 04 · Connectors ======= -->
+    <section class="section" id="connectors">
+      <p class="section-no reveal">04 &mdash; The Connector Engine</p>
+      <h2 class="section-title reveal" style="--d:.06s">Wired to your tools.<br /><em>Not to their clouds.</em></h2>
+
+      <div class="connector-grid">
+        <div class="connector-copy reveal" style="--d:.1s">
+          <p>A modular <span class="mono-chip">ConnectorManager</span> polls APIs directly from
+            your machine. Connectors receive credentials through an injected secret store &mdash;
+            they never import Electron, which keeps them unit-tested, portable, and honest.</p>
+          <div class="connector-row">
+            <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/gitlab.png" alt="GitLab" width="22" height="22" /><span>GitLab</span></div>
+            <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/ms-outlook.png" alt="Outlook" width="22" height="22" /><span>Outlook</span></div>
+            <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/timer.png" alt="Pomodoro" width="22" height="22" /><span>Pomodoro</span></div>
+          </div>
+          <p>And for everything else, a lightweight local webhook lets your existing tools
+            speak light &mdash; native hooks in Git, npm, or Docker can fire a cue with one
+            request. No plugin required, ever.</p>
+          <div class="connector-row">
+            <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/git.png" alt="Git" width="22" height="22" /><span>git hooks</span></div>
+            <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/console.png" alt="Terminal" width="22" height="22" /><span>npm scripts</span></div>
+            <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/docker.png" alt="Docker" width="22" height="22" /><span>docker</span></div>
+          </div>
+        </div>
+
+        <figure class="code-panel reveal" style="--d:.2s">
+          <figcaption class="code-title mono"><span class="code-dot"></span>your terminal &rarr; your screen</figcaption>
+          <pre class="mono"><code><span class="c-cmd">Invoke-RestMethod</span> <span class="c-flag">-Uri</span> http://127.0.0.1:49123/notify <span class="c-flag">-Method</span> POST <span class="c-cont">`</span>
+  <span class="c-flag">-Body</span> <span class="c-str">'{"cue":"glow-pulse",
+          "color":"rgba(56,197,255,0.6)",
+          "msg":"pipeline #4183 passed"}'</span> <span class="c-cont">`</span>
+  <span class="c-flag">-ContentType</span> <span class="c-str">'application/json'</span></code></pre>
+          <button class="code-run mono" id="codeRun" type="button">&#9655; run it &mdash; watch the edge</button>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ======= Windows 11 strip ======= -->
+    <section class="section win-section" id="windows">
+      <div class="win-head reveal">
+        <img src="https://img.icons8.com/ios/100/e9eef7/windows-11.png" alt="" width="30" height="30" />
+        <h2>Tuned first for Windows&nbsp;11.<span class="win-sub"> Degrading gracefully everywhere else.</span></h2>
+      </div>
+      <div class="win-grid">
+        <div class="win-item reveal" style="--d:.05s">
+          <img src="https://img.icons8.com/ios/100/94a0b5/paint-palette.png" alt="" width="24" height="24" />
+          <h4>Accent-colour harmony</h4>
+          <p>Cues without an explicit colour inherit your Windows accent &mdash; live, the moment you change it.</p>
+        </div>
+        <div class="win-item reveal" style="--d:.12s">
+          <img src="https://img.icons8.com/ios/100/94a0b5/windows-11.png" alt="" width="24" height="24" />
+          <h4>Fluent settings</h4>
+          <p>Mica backdrop, Segoe UI Variable, Win11 cards and toggles that follow the system theme.</p>
+        </div>
+        <div class="win-item reveal" style="--d:.19s">
+          <img src="https://img.icons8.com/ios/100/94a0b5/moon-symbol.png" alt="" width="24" height="24" />
+          <h4>Tray as status</h4>
+          <p>The tooltip says what Periphery is doing; held cues add a small accent badge dot. That&rsquo;s the whole UI.</p>
+        </div>
+        <div class="win-item reveal" style="--d:.26s">
+          <img src="https://img.icons8.com/ios/100/94a0b5/speed.png" alt="" width="24" height="24" />
+          <h4>Power &amp; motion aware</h4>
+          <p>Cheaper animations on battery; with reduce-motion set, travelling cues become stationary fades.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= Final CTA ======= -->
+    <section class="section outro" id="run">
+      <h2 class="outro-title reveal">Turn the noise<br /><em>into light.</em></h2>
+      <p class="section-lede outro-lede reveal" style="--d:.08s">
+        Periphery is an open proof-of-concept built on Electron &mdash; transparent,
+        click-through overlays on every display, invisible until a cue arrives.
+      </p>
+      <figure class="code-panel outro-code reveal" style="--d:.16s">
+        <figcaption class="code-title mono"><span class="code-dot"></span>three commands to quiet</figcaption>
+        <pre class="mono"><code><span class="c-cmd">npm</span> install
+<span class="c-cmd">npm</span> start
+<span class="c-com"># then trigger your first cue:</span>
+<span class="c-cmd">curl</span> <span class="c-flag">-X</span> POST http://127.0.0.1:49123/notify <span class="c-cont">\</span>
+  <span class="c-flag">-d</span> <span class="c-str">'{"cue":"glow-pulse","msg":"hello"}'</span></code></pre>
+      </figure>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-brand">
+      <svg viewBox="0 0 100 100" width="22" height="22" role="img" aria-hidden="true">
+        <defs><mask id="footGap"><rect width="100" height="100" fill="#fff"/><circle cx="71.2" cy="28.8" r="20" fill="#000"/></mask></defs>
+        <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" stroke-width="15" mask="url(#footGap)"/>
+        <circle cx="71.2" cy="28.8" r="14" fill="#38c5ff"/>
+      </svg>
+      <span>Periphery &mdash; signal at the edge of attention.</span>
+    </div>
+    <p class="footer-note mono">Local-first &middot; no telemetry &middot; motion on this page honors <span class="mono-chip">prefers-reduced-motion</span>, just like the app &middot; icons by <a href="https://icons8.com" rel="noopener">icons8</a></p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
