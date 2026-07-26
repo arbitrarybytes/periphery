@@ -527,6 +527,10 @@ function registerIpcHandlers() {
 // ---------------------------------------------------------------------------
 
 function main() {
+  // A stable AppUserModelID keeps the tray identity and any future toasts
+  // grouped under one app on Windows instead of under "electron.app".
+  if (IS_WINDOWS) app.setAppUserModelId('com.flowstate.poc');
+
   app.whenReady().then(() => {
     refreshAccent();
     uiState.onBattery = powerMonitor.isOnBatteryPower();
@@ -601,7 +605,9 @@ function main() {
 
   app.on('second-instance', () => {
     // Another launch means the user is looking for the app; show Settings.
-    createSettingsWindow();
+    // The event can arrive while this instance is still starting up, so gate
+    // window creation on readiness.
+    app.whenReady().then(createSettingsWindow);
   });
 
   // FlowState lives in the tray, so closing a window must not end the session.
@@ -614,11 +620,8 @@ function main() {
     isQuitting = true;
     if (connectorManager) connectorManager.stopAll();
     if (webhookServer) webhookServer.close();
-    if (focusMonitor) {
-      // Clear the timer only; the usual stop() would fire a flush cue mid-quit.
-      clearInterval(focusMonitor.timerId);
-      focusMonitor.timerId = null;
-    }
+    // dispose(), not stop(): stop() would fire a flush cue mid-quit.
+    if (focusMonitor) focusMonitor.dispose();
     if (slackTide) slackTide.stop();
   });
 }

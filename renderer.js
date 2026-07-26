@@ -29,6 +29,8 @@ const container = document.getElementById('cue-container');
  * @returns {number}
  */
 function clampRepeats(value) {
+  // Blank means "default", not zero — same rule as utils/cuePayload.js.
+  if (typeof value === 'string' && value.trim() === '') return REPEATS_DEFAULT;
   const num = Number(value);
   if (!Number.isFinite(num)) return REPEATS_DEFAULT;
   return Math.min(REPEATS_MAX, Math.max(REPEATS_MIN, Math.round(num)));
@@ -164,7 +166,10 @@ function renderConstellation(stars) {
 
   if (stars.length === 0) {
     layer.classList.add('constellation-clearing');
-    constellationClearTimer = setTimeout(() => layer.replaceChildren(), CONSTELLATION_FADE_MS);
+    constellationClearTimer = setTimeout(() => {
+      constellationClearTimer = null;
+      layer.replaceChildren();
+    }, CONSTELLATION_FADE_MS);
     return;
   }
 

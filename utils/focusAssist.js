@@ -51,11 +51,19 @@ class FocusAssistMonitor {
 
   /** Stops polling and reports "not disturbed", so held cues get flushed. */
   stop() {
+    this.dispose();
+    this._set(false);
+  }
+
+  /**
+   * Stops polling without reporting a state change. For shutdown, where
+   * stop()'s flush would fire a summary cue into windows being torn down.
+   */
+  dispose() {
     if (this.timerId) {
       clearInterval(this.timerId);
       this.timerId = null;
     }
-    this._set(false);
   }
 
   _probe() {

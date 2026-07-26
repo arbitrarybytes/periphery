@@ -88,8 +88,7 @@ function isDoNotDisturb(state) {
     && state !== QUNS_ACCEPTS_NOTIFICATIONS;
 }
 
-/** Message cap mirrored from utils/cuePayload.js MSG_MAX_LENGTH. */
-const SUMMARY_MSG_MAX = 160;
+const { MSG_MAX_LENGTH: SUMMARY_MSG_MAX } = require('./cuePayload');
 
 /**
  * Tallies held cues by their source icon for the flush summary.

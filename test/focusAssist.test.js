@@ -72,6 +72,16 @@ test('stop() reports not-disturbed so held cues can be flushed', () => {
   assert.deepEqual(changes, [true, false]);
 });
 
+test('dispose() stops polling without reporting a state change', () => {
+  const { monitor, changes } = startMonitor([{ stdout: '4' }]);
+  assert.deepEqual(changes, [true]);
+
+  monitor.dispose();
+  assert.equal(monitor.timerId, null);
+  // Unlike stop(), no trailing "false" — nothing gets flushed mid-shutdown.
+  assert.deepEqual(changes, [true]);
+});
+
 test('start() is idempotent', () => {
   const { monitor, changes } = startMonitor([{ stdout: '4' }]);
   monitor.start();
