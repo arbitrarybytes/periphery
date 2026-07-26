@@ -38,6 +38,15 @@ Any process running as your user can still post cues. Treat the endpoint as an "
 
 Responses are `200` on success, `400` for an unknown cue or a malformed body, and `403` for a request that fails the origin/host checks.
 
+## Delivery Semantics
+
+A `200` means the cue was **accepted**, not that it is on screen yet. Webhook cues go through the same attention-aware delivery as every other source:
+
+*   While focus mode is on (Focus Assist, presentation mode, or the tray toggle), non-urgent cues (`glow`, `glow-pulse`, `glow-bottom`) are held and appear only in the summary when focus ends. A `comet` always shows immediately.
+*   While the user is actively typing, non-urgent cues wait for the next typing pause (up to 90 seconds) before appearing.
+
+If your integration needs a cue to punch through no matter what — a Sev-1 page, a failed deploy gate — send `"cue": "comet"`.
+
 ---
 
 ## Common Integrations

@@ -6,6 +6,8 @@ const JsonFileStore = require('./JsonFileStore');
 const DEFAULTS = Object.freeze({
   glowRepeats: 3,
   verboseMode: true,
+  respectFocusAssist: true,
+  slackTideEnabled: true,
   pomodoroEnabled: true,
   pomodoroMinutes: 25,
   outlookEnabled: true,

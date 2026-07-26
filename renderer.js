@@ -132,3 +132,82 @@ window.flowstate.onCue((payload) => {
     triggerText(msg, color, icon);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Constellation: cues held during focus leave dim stars in the top-right
+// corner, so a glance shows how much accumulated without saying what.
+// ---------------------------------------------------------------------------
+
+const CONSTELLATION_STAR_MAX = 24;
+/** Matches the #constellation opacity transition in styles.css. */
+const CONSTELLATION_FADE_MS = 1200;
+/** Golden angle in radians; gives an even, organic sunflower scatter. */
+const GOLDEN_ANGLE = 2.39996;
+
+let constellationClearTimer = null;
+
+function constellationLayer() {
+  let layer = document.getElementById('constellation');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'constellation';
+    container.appendChild(layer);
+  }
+  return layer;
+}
+
+/**
+ * @param {Array<{color?: string|null}>} stars
+ */
+function renderConstellation(stars) {
+  const layer = constellationLayer();
+
+  if (stars.length === 0) {
+    layer.classList.add('constellation-clearing');
+    constellationClearTimer = setTimeout(() => layer.replaceChildren(), CONSTELLATION_FADE_MS);
+    return;
+  }
+
+  if (constellationClearTimer) {
+    clearTimeout(constellationClearTimer);
+    constellationClearTimer = null;
+  }
+  layer.classList.remove('constellation-clearing');
+  layer.replaceChildren();
+
+  stars.slice(0, CONSTELLATION_STAR_MAX).forEach((star, i) => {
+    const el = document.createElement('div');
+    el.classList.add('constellation-star');
+
+    // Deterministic positions, so existing stars keep their place as new
+    // ones arrive instead of the whole sky reshuffling.
+    const radius = 12 * Math.sqrt(i + 0.5);
+    el.style.right = `${70 + radius * Math.cos(i * GOLDEN_ANGLE)}px`;
+    el.style.top = `${80 + radius * Math.sin(i * GOLDEN_ANGLE)}px`;
+    el.style.animationDelay = `${(i % 7) * 0.6}s`;
+
+    if (star && typeof star.color === 'string') {
+      el.style.setProperty('--star-color', star.color);
+    }
+    layer.appendChild(el);
+  });
+}
+
+window.flowstate.onConstellation((data) => {
+  if (data === null || typeof data !== 'object' || !Array.isArray(data.stars)) return;
+  renderConstellation(data.stars);
+});
+
+window.flowstate.onTheme((theme) => {
+  if (theme === null || typeof theme !== 'object') return;
+
+  const root = document.documentElement;
+  if (typeof theme.accent === 'string') {
+    root.style.setProperty('--accent-color', theme.accent);
+  }
+  if (typeof theme.accentSoft === 'string') {
+    root.style.setProperty('--accent-soft', theme.accentSoft);
+  }
+  // On battery the stylesheet swaps to shorter, cheaper animations.
+  document.body.classList.toggle('eco', theme.onBattery === true);
+});

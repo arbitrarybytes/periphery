@@ -52,7 +52,16 @@ function flashStatus(message) {
 async function loadConfig() {
   const config = await window.flowstateSettings.getConfig();
 
+  // Match the OS accent (buttons, toggles, focus rings) and hide the
+  // Windows-only section elsewhere.
+  if (typeof config.accentColor === 'string') {
+    document.documentElement.style.setProperty('--accent', config.accentColor);
+  }
+  $('windowsSection').hidden = config.isWindows === false;
+
   $('verboseMode').checked = config.verboseMode !== false;
+  $('respectFocusAssist').checked = config.respectFocusAssist !== false;
+  $('slackTideEnabled').checked = config.slackTideEnabled !== false;
   $('glowRepeats').value = config.glowRepeats ?? REPEATS_DEFAULT;
 
   $('pomodoroEnabled').checked = config.pomodoroEnabled !== false;
@@ -79,6 +88,8 @@ async function save() {
   const result = await window.flowstateSettings.saveConfig({
     verboseMode: $('verboseMode').checked,
     glowRepeats: repeats,
+    respectFocusAssist: $('respectFocusAssist').checked,
+    slackTideEnabled: $('slackTideEnabled').checked,
 
     pomodoroEnabled: $('pomodoroEnabled').checked,
     pomodoroMinutes,

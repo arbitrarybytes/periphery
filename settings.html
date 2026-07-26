@@ -9,7 +9,12 @@
 </head>
 <body>
 
-  <h1>FlowState Settings</h1>
+  <!-- Drag region under the Windows Controls Overlay (titleBarStyle: hidden) -->
+  <header class="titlebar"><span class="titlebar-label">FlowState</span></header>
+
+  <main class="content">
+
+  <h1>Settings</h1>
 
   <div class="section">
     <div class="section-title">General Appearance</div>
@@ -28,9 +33,37 @@
     </div>
 
     <div class="form-group row">
+      <label for="slackTideEnabled">Wait for a typing pause (Slack Tide)</label>
+      <label class="switch">
+        <input type="checkbox" id="slackTideEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      While you are actively typing, non-urgent cues are held and released in
+      your next natural pause — up to 90 seconds, then they come through anyway.
+    </p>
+
+    <div class="form-group row">
       <label>Preview a cue</label>
       <button type="button" id="testCueBtn" class="secondary">Send Test Cue</button>
     </div>
+  </div>
+
+  <div class="section" id="windowsSection">
+    <div class="section-title">Windows</div>
+    <div class="form-group row">
+      <label for="respectFocusAssist">Respect Focus Assist / Do Not Disturb</label>
+      <label class="switch">
+        <input type="checkbox" id="respectFocusAssist">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      While Windows is set to Do Not Disturb, presenting, or you toggle Focus mode
+      from the tray, only urgent cues get through. Everything else is held and
+      summarized in a single quiet glow when focus ends.
+    </p>
   </div>
 
   <div class="section">
@@ -98,6 +131,8 @@
     <span class="hint" id="saveStatus" role="status"></span>
     <button type="button" id="saveBtn">Save Settings</button>
   </div>
+
+  </main>
 
   <script src="settings.js"></script>
 </body>

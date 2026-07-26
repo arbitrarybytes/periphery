@@ -1,11 +1,21 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
+const {
+  app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, nativeTheme,
+  powerMonitor, screen, systemPreferences,
+} = require('electron');
 const path = require('path');
 
 const secureStore = require('./utils/secureStore');
 const configStore = require('./utils/configStore');
 const { clampRepeats } = require('./utils/cuePayload');
+const {
+  FALLBACK_ACCENT, parseAccentColor, accentCss, cueTier, shouldDefer,
+  countHeldIcons, deferredSummaryCue,
+} = require('./utils/win11');
+const { drawBadgeDot } = require('./utils/trayBadge');
+const { FocusAssistMonitor } = require('./utils/focusAssist');
+const { SlackTideQueue } = require('./utils/slackTide');
 const ConnectorManager = require('./connectors/ConnectorManager');
 const TimeoutConnector = require('./connectors/timeout');
 const GitLabConnector = require('./connectors/gitlab');
@@ -18,13 +28,71 @@ const SECRET_KEYS = { gitlabPat: GITLAB_PAT_KEY, outlookToken: OUTLOOK_TOKEN_KEY
 /** How long to wait for a burst of display changes to settle before rebuilding. */
 const DISPLAY_SETTLE_MS = 500;
 
+const IS_WINDOWS = process.platform === 'win32';
+
 /** @type {BrowserWindow[]} One click-through overlay per display. */
 let overlayWindows = [];
 let settingsWindow = null;
 let tray = null;
+/** Unbadged tray icon, kept so the badge can be re-composited or removed. */
+let trayBaseIcon = null;
 let connectorManager = null;
 let webhookServer = null;
+/** @type {FocusAssistMonitor|null} */
+let focusMonitor = null;
+/** @type {SlackTideQueue|null} */
+let slackTide = null;
 let isQuitting = false;
+
+/** Most stars the constellation keeps individually; the total keeps counting. */
+const CONSTELLATION_MAX = 24;
+
+/** Windows integration state: accent colour, power source, focus deferral. */
+const uiState = {
+  accent: FALLBACK_ACCENT,
+  onBattery: false,
+  /** Focus mode toggled by hand from the tray menu. */
+  manualFocus: false,
+  /** Focus Assist / DND / presentation mode reported by Windows. */
+  detectedDnd: false,
+  /**
+   * Tier 2-3 cues held while focused. Each entry becomes a constellation
+   * star; everything is flushed as one summary when focus ends.
+   * @type {Array<{color: string|null, icon: string|null}>}
+   */
+  heldCues: [],
+  /** Total held this focus session (heldCues is capped, this is not). */
+  heldTotal: 0,
+};
+
+// ---------------------------------------------------------------------------
+// Windows theming (accent colour, battery state)
+// ---------------------------------------------------------------------------
+
+function refreshAccent() {
+  if (!IS_WINDOWS) return;
+  const parsed = parseAccentColor(systemPreferences.getAccentColor());
+  if (parsed) uiState.accent = parsed;
+}
+
+function themePayload() {
+  return {
+    accent: accentCss(uiState.accent, 0.85),
+    accentSoft: accentCss(uiState.accent, 0.55),
+    onBattery: uiState.onBattery,
+  };
+}
+
+/** @param {BrowserWindow} window */
+function sendTheme(window) {
+  if (!window.isDestroyed()) {
+    window.webContents.send('set-theme', themePayload());
+  }
+}
+
+function broadcastTheme() {
+  for (const window of overlayWindows) sendTheme(window);
+}
 
 // ---------------------------------------------------------------------------
 // Overlay windows
@@ -65,6 +133,13 @@ function createOverlayWindow(display) {
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   // The overlay is decorative: never let it swallow a click.
   window.setIgnoreMouseEvents(true, { forward: true });
+
+  // Standing state (theme, constellation) must arrive after the page has
+  // listeners, and again on every rebuild, so it rides on did-finish-load.
+  window.webContents.on('did-finish-load', () => {
+    sendTheme(window);
+    sendConstellation(window);
+  });
 
   window.loadFile('index.html');
   return window;
@@ -119,8 +194,111 @@ function broadcastCue(payload) {
 }
 
 // ---------------------------------------------------------------------------
+// Focus deferral (Focus Assist / manual focus mode) & the Constellation
+// ---------------------------------------------------------------------------
+
+function isFocused() {
+  return uiState.manualFocus
+    || (configStore.get('respectFocusAssist') !== false && uiState.detectedDnd);
+}
+
+function constellationPayload() {
+  return { stars: uiState.heldCues, total: uiState.heldTotal };
+}
+
+/** @param {BrowserWindow} window */
+function sendConstellation(window) {
+  if (!window.isDestroyed()) {
+    window.webContents.send('constellation', constellationPayload());
+  }
+}
+
+function broadcastConstellation() {
+  for (const window of overlayWindows) sendConstellation(window);
+}
+
+/**
+ * Holds a cue during focus. Instead of vanishing into a counter it leaves a
+ * dim star in the overlay's corner, so a glance shows how much accumulated.
+ * @param {object} payload
+ */
+function holdForConstellation(payload) {
+  uiState.heldTotal += 1;
+  uiState.heldCues.push({
+    color: typeof payload.color === 'string' ? payload.color : null,
+    icon: typeof payload.icon === 'string' ? payload.icon : null,
+  });
+  if (uiState.heldCues.length > CONSTELLATION_MAX) uiState.heldCues.shift();
+  broadcastConstellation();
+  updateTray();
+}
+
+/**
+ * Routes a cue from any source (connector, webhook).
+ * Priority: focus hold (constellation) → slack tide (wait for a typing
+ * pause) → immediate broadcast. Tier 1 cues always go straight through.
+ * @param {object} payload - already validated by the caller
+ */
+function deliverCue(payload) {
+  if (shouldDefer(payload, isFocused())) {
+    holdForConstellation(payload);
+    return;
+  }
+  if (slackTide && cueTier(payload) >= 2 && configStore.get('slackTideEnabled') !== false) {
+    slackTide.push(payload); // delivers immediately if the user is already pausing
+    return;
+  }
+  broadcastCue(payload);
+}
+
+/** Called on every manual or detected focus transition. */
+function onFocusChanged() {
+  if (!isFocused() && uiState.heldTotal > 0) {
+    broadcastCue(deferredSummaryCue(
+      uiState.heldTotal,
+      accentCss(uiState.accent, 0.7),
+      countHeldIcons(uiState.heldCues),
+    ));
+    uiState.heldTotal = 0;
+    uiState.heldCues = [];
+    broadcastConstellation(); // empty payload fades the stars out
+  }
+  updateTray();
+}
+
+/**
+ * Starts or stops the Focus Assist probe to match platform and settings.
+ * Stopping reports "not disturbed", which flushes anything held.
+ */
+function syncFocusMonitor() {
+  const wanted = IS_WINDOWS && configStore.get('respectFocusAssist') !== false;
+  if (wanted && !focusMonitor) {
+    focusMonitor = new FocusAssistMonitor({
+      onChange: (dnd) => {
+        uiState.detectedDnd = dnd;
+        onFocusChanged();
+      },
+    });
+    focusMonitor.start();
+  } else if (!wanted && focusMonitor) {
+    focusMonitor.stop();
+    focusMonitor = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Settings window & tray
 // ---------------------------------------------------------------------------
+
+/** Window Controls Overlay colours that follow the OS light/dark theme. */
+function titleBarOverlayOptions() {
+  return {
+    // Transparent so the Mica backdrop runs through the caption area.
+    color: '#00000000',
+    symbolColor: nativeTheme.shouldUseDarkColors ? '#ffffff' : '#1a1a1a',
+    height: 40,
+  };
+}
 
 function createSettingsWindow() {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -130,10 +308,18 @@ function createSettingsWindow() {
   }
 
   settingsWindow = new BrowserWindow({
-    width: 520,
-    height: 780,
+    width: 560,
+    height: 800,
+    minWidth: 480,
+    minHeight: 560,
     title: 'FlowState Settings',
     autoHideMenuBar: true,
+    show: false, // Shown on ready-to-show so Mica never flashes white.
+    ...(IS_WINDOWS ? {
+      backgroundMaterial: 'mica',
+      titleBarStyle: 'hidden',
+      titleBarOverlay: titleBarOverlayOptions(),
+    } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload-settings.js'),
       contextIsolation: true,
@@ -142,24 +328,25 @@ function createSettingsWindow() {
     },
   });
 
+  settingsWindow.once('ready-to-show', () => settingsWindow.show());
   settingsWindow.loadFile('settings.html');
   settingsWindow.on('closed', () => {
     settingsWindow = null;
   });
 }
 
-function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
-  if (icon.isEmpty()) {
-    // A blank tray icon would leave the user with no way to reach Settings or
-    // Quit, so make the cause obvious rather than shipping an invisible tray.
-    console.error('[Tray] assets/tray.png could not be loaded; the tray icon will be blank.');
-  }
-
-  tray = new Tray(icon);
-  tray.setToolTip('FlowState');
-  tray.setContextMenu(Menu.buildFromTemplate([
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
     { label: 'Settings', click: createSettingsWindow },
+    {
+      label: 'Focus mode',
+      type: 'checkbox',
+      checked: uiState.manualFocus,
+      click: (item) => {
+        uiState.manualFocus = item.checked;
+        onFocusChanged();
+      },
+    },
     { type: 'separator' },
     {
       label: 'Quit FlowState',
@@ -168,8 +355,50 @@ function createTray() {
         app.quit();
       },
     },
-  ]));
+  ]);
+}
+
+/**
+ * Keeps the tray truthful: menu checkbox, a tooltip that says what FlowState
+ * is doing, and an accent-coloured badge dot while cues are being held.
+ */
+function updateTray() {
+  if (!tray) return;
+
+  tray.setContextMenu(buildTrayMenu());
+
+  const held = uiState.heldTotal;
+  tray.setToolTip(isFocused()
+    ? `FlowState — focus mode${held > 0 ? `, ${held} update${held === 1 ? '' : 's'} held` : ''}`
+    : 'FlowState — watching');
+
+  if (!trayBaseIcon || trayBaseIcon.isEmpty()) return;
+  try {
+    if (held > 0) {
+      const { width, height } = trayBaseIcon.getSize();
+      const badged = drawBadgeDot(trayBaseIcon.toBitmap(), width, height, uiState.accent);
+      tray.setImage(nativeImage.createFromBitmap(badged, { width, height }));
+    } else {
+      tray.setImage(trayBaseIcon);
+    }
+  } catch (err) {
+    // The badge is decoration; never let it take the tray icon down with it.
+    console.error('[Tray] Could not composite badge dot', err);
+    tray.setImage(trayBaseIcon);
+  }
+}
+
+function createTray() {
+  trayBaseIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
+  if (trayBaseIcon.isEmpty()) {
+    // A blank tray icon would leave the user with no way to reach Settings or
+    // Quit, so make the cause obvious rather than shipping an invisible tray.
+    console.error('[Tray] assets/tray.png could not be loaded; the tray icon will be blank.');
+  }
+
+  tray = new Tray(trayBaseIcon);
   tray.on('click', createSettingsWindow);
+  updateTray();
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +460,9 @@ function registerIpcHandlers() {
     // Never return secrets to the renderer; only whether one is stored.
     hasGitlabPat: secureStore.hasSecret(GITLAB_PAT_KEY),
     hasOutlookToken: secureStore.hasSecret(OUTLOOK_TOKEN_KEY),
+    // Presentation-only extras so the settings UI can match the OS.
+    accentColor: accentCss(uiState.accent, 1),
+    isWindows: IS_WINDOWS,
   }));
 
   ipcMain.handle('save-config', (event, config) => {
@@ -241,6 +473,8 @@ function registerIpcHandlers() {
     configStore.setMany({
       verboseMode: Boolean(config.verboseMode),
       glowRepeats: clampRepeats(config.glowRepeats),
+      respectFocusAssist: Boolean(config.respectFocusAssist),
+      slackTideEnabled: Boolean(config.slackTideEnabled),
       pomodoroEnabled: Boolean(config.pomodoroEnabled),
       pomodoroMinutes: clampNumber(config.pomodoroMinutes, 1, 240, 25),
       gitlabEnabled: Boolean(config.gitlabEnabled),
@@ -259,6 +493,11 @@ function registerIpcHandlers() {
     }
 
     initConnectors();
+    syncFocusMonitor();
+    onFocusChanged(); // Turning "respect Focus Assist" off must release held cues.
+    if (slackTide && configStore.get('slackTideEnabled') === false) {
+      slackTide.flush(); // Turning slack tide off must release its queue too.
+    }
     return { success: true };
   });
 
@@ -272,9 +511,10 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('send-test-cue', (event, cue) => {
+    // Deliberately skips focus deferral: the user just clicked the button.
     broadcastCue({
       cue: typeof cue === 'string' ? cue : 'glow-pulse',
-      color: 'rgba(0, 150, 255, 0.7)',
+      color: accentCss(uiState.accent, 0.7),
       msg: 'FlowState test cue',
       icon: 'alert',
     });
@@ -288,11 +528,29 @@ function registerIpcHandlers() {
 
 function main() {
   app.whenReady().then(() => {
+    refreshAccent();
+    uiState.onBattery = powerMonitor.isOnBatteryPower();
+
     rebuildOverlays();
     createTray();
     registerIpcHandlers();
+    syncFocusMonitor();
 
-    connectorManager = new ConnectorManager(broadcastCue);
+    slackTide = new SlackTideQueue({
+      // Focus is re-checked at release time: a cue queued in the tide before
+      // focus mode began must join the constellation, not break through when
+      // the tide flushes mid-focus.
+      deliver: (payload) => {
+        if (shouldDefer(payload, isFocused())) {
+          holdForConstellation(payload);
+        } else {
+          broadcastCue(payload);
+        }
+      },
+      getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
+    });
+
+    connectorManager = new ConnectorManager(deliverCue);
     initConnectors();
 
     // Displays come and go (docking, projectors); keep one overlay on each.
@@ -300,8 +558,31 @@ function main() {
     screen.on('display-removed', scheduleOverlayRebuild);
     screen.on('display-metrics-changed', scheduleOverlayRebuild);
 
+    // Follow the OS: accent repaints cues and the tray badge, battery state
+    // switches the overlay into its low-power animation profile.
+    if (IS_WINDOWS) {
+      systemPreferences.on('accent-color-changed', () => {
+        refreshAccent();
+        broadcastTheme();
+        updateTray();
+      });
+      nativeTheme.on('updated', () => {
+        if (settingsWindow && !settingsWindow.isDestroyed()) {
+          settingsWindow.setTitleBarOverlay(titleBarOverlayOptions());
+        }
+      });
+    }
+    powerMonitor.on('on-battery', () => {
+      uiState.onBattery = true;
+      broadcastTheme();
+    });
+    powerMonitor.on('on-ac', () => {
+      uiState.onBattery = false;
+      broadcastTheme();
+    });
+
     webhookServer = startWebhookServer({
-      onCue: broadcastCue,
+      onCue: deliverCue,
       port: DEFAULT_PORT,
       onError: (err) => {
         const detail = err.code === 'EADDRINUSE'
@@ -333,6 +614,12 @@ function main() {
     isQuitting = true;
     if (connectorManager) connectorManager.stopAll();
     if (webhookServer) webhookServer.close();
+    if (focusMonitor) {
+      // Clear the timer only; the usual stop() would fire a flush cue mid-quit.
+      clearInterval(focusMonitor.timerId);
+      focusMonitor.timerId = null;
+    }
+    if (slackTide) slackTide.stop();
   });
 }
 
