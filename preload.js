@@ -29,4 +29,27 @@ contextBridge.exposeInMainWorld('periphery', {
   onConstellation(handler) {
     ipcRenderer.on('constellation', (event, data) => handler(data));
   },
+  /**
+   * The user is back at the keyboard: fade all agent beacons, replaying each
+   * one's message pill once on the way out.
+   * @param {() => void} handler
+   */
+  onAgentAck(handler) {
+    ipcRenderer.on('agent-ack', () => handler());
+  },
+  /**
+   * Digest panel content (end-of-focus, or "while you were away").
+   * @param {(data: object) => void} handler
+   */
+  onDigest(handler) {
+    ipcRenderer.on('digest', (event, data) => handler(data));
+  },
+  /**
+   * Asks the main process for real mouse events while the pointer is over
+   * the digest panel; false restores the overlay's click-through state.
+   * @param {boolean} interactive
+   */
+  setDigestInteractive(interactive) {
+    ipcRenderer.send('digest-interactive', interactive === true);
+  },
 });

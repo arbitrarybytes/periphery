@@ -19,18 +19,28 @@ const {
 const { drawBadgeDot } = require('./utils/trayBadge');
 const { FocusAssistMonitor } = require('./utils/focusAssist');
 const { SlackTideQueue } = require('./utils/slackTide');
+const { AgentAckWatcher } = require('./utils/agentBeacon');
+const { DigestLog, AwayTracker } = require('./utils/digest');
+const { TeamsPresenceMonitor } = require('./utils/teamsPresence');
+const { WARN } = require('./utils/palette');
 const ConnectorManager = require('./connectors/ConnectorManager');
 const TimeoutConnector = require('./connectors/timeout');
 const GitLabConnector = require('./connectors/gitlab');
+const GitHubConnector = require('./connectors/github');
 const OutlookConnector = require('./connectors/outlook');
 const { startWebhookServer, DEFAULT_PORT } = require('./server/webhookServer');
 
 /** Settings-form field -> secure-store key for each stored credential. */
-const SECRET_KEYS = { gitlabPat: 'gitlab-pat', outlookToken: 'outlook-token' };
+const SECRET_KEYS = {
+  gitlabPat: 'gitlab-pat',
+  githubPat: 'github-pat',
+  outlookToken: 'outlook-token',
+};
 /** Config keys the connectors are built from; changes here require a restart. */
 const CONNECTOR_CONFIG_KEYS = [
   'pomodoroEnabled', 'pomodoroMinutes',
   'gitlabEnabled', 'gitlabProjectId',
+  'githubEnabled', 'githubRepo',
   'outlookEnabled', 'outlookEmail',
 ];
 /** How long to wait for a burst of display changes to settle before rebuilding. */
@@ -50,6 +60,15 @@ let webhookServer = null;
 let focusMonitor = null;
 /** @type {SlackTideQueue|null} */
 let slackTide = null;
+/** @type {TeamsPresenceMonitor|null} */
+let teamsPresence = null;
+/** @type {AgentAckWatcher|null} Fades agent beacons once the user is back. */
+let agentAck = null;
+/** What was held during focus, for the end-of-focus digest panel. */
+const focusDigest = new DigestLog();
+/** What arrived while the screen was locked, for the away summary. */
+const awayLog = new DigestLog();
+const awayTracker = new AwayTracker();
 let isQuitting = false;
 
 /** Most stars the constellation keeps individually; the total keeps counting. */
@@ -63,6 +82,8 @@ const uiState = {
   manualFocus: false,
   /** Focus Assist / DND / presentation mode reported by Windows. */
   detectedDnd: false,
+  /** In a call / presenting / DND reported by Teams presence sync. */
+  teamsDnd: false,
   /**
    * Tier 2-3 cues held while focused. Each entry becomes a constellation
    * star; everything is flushed as one summary when focus ends.
@@ -192,12 +213,35 @@ function scheduleOverlaySync() {
 }
 
 /**
+ * Sends a cue to the overlay on the primary display only — used for the
+ * digest panel, which is interactive and should not appear N times.
+ */
+function sendToPrimary(channel, payload) {
+  const displays = screen.getAllDisplays();
+  const primaryId = screen.getPrimaryDisplay().id;
+  // Overlays are created from getAllDisplays() in order, so indexes line up.
+  const index = displays.findIndex((display) => display.id === primaryId);
+  const window = overlayWindows[index] || overlayWindows[0];
+  if (window) send(window, channel, payload);
+}
+
+/**
  * Sends a cue, enriched with the user's display preferences, to every overlay.
  * @param {object} payload - already validated
  */
 function broadcastCue(payload) {
+  let out = payload;
+  if (payload.cue === 'glow-agent') {
+    if (configStore.get('agentCuesEnabled') === false) {
+      // Feature toggle off: agent cues downgrade to a plain edge glow rather
+      // than disappearing — the notification still happens, just unstickied.
+      out = { ...payload, cue: 'glow' };
+    } else if (agentAck) {
+      agentAck.notifyDelivered();
+    }
+  }
   broadcast('trigger-cue', {
-    ...payload,
+    ...out,
     repeats: clampRepeats(configStore.get('glowRepeats')),
     speedFactor: glowSpeedFactor(configStore.get('glowSpeed')),
     verbose: configStore.get('verboseMode') !== false,
@@ -210,7 +254,8 @@ function broadcastCue(payload) {
 
 function isFocused() {
   return uiState.manualFocus
-    || (configStore.get('respectFocusAssist') !== false && uiState.detectedDnd);
+    || (configStore.get('respectFocusAssist') !== false && uiState.detectedDnd)
+    || (configStore.get('teamsPresenceEnabled') === true && uiState.teamsDnd);
 }
 
 function constellationPayload() {
@@ -229,6 +274,7 @@ function holdForConstellation(payload) {
     icon: typeof payload.icon === 'string' ? payload.icon : null,
   });
   if (uiState.heldCues.length > CONSTELLATION_MAX) uiState.heldCues.shift();
+  focusDigest.add(payload); // remembered for the end-of-focus digest panel
   broadcast('constellation', constellationPayload());
   updateTray();
 }
@@ -240,6 +286,11 @@ function holdForConstellation(payload) {
  * @param {object} payload
  */
 function deliverFinal(payload) {
+  // While the screen is locked, remember what went by for the away summary.
+  // The cue still broadcasts — a locked screen just doesn't show it.
+  if (awayTracker.isLocked() && configStore.get('awaySummaryEnabled') !== false) {
+    awayLog.add(payload);
+  }
   if (shouldDefer(payload, isFocused())) {
     holdForConstellation(payload);
   } else {
@@ -259,7 +310,10 @@ function deliverCue(rawPayload) {
   if (!payload) return;
 
   const heldByFocus = shouldDefer(payload, isFocused());
+  // Agent beacons skip the slack tide: they persist until acknowledged, so
+  // waiting for a typing pause would add delay without reducing interruption.
   if (!heldByFocus && slackTide && cueTier(payload) >= 2
+      && payload.cue !== 'glow-agent'
       && configStore.get('slackTideEnabled') !== false) {
     slackTide.push(payload); // delivers immediately if the user is already pausing
     return;
@@ -275,11 +329,60 @@ function onFocusChanged() {
       accentCss(uiState.accent, 0.7),
       countHeldIcons(uiState.heldCues),
     ));
+    const digest = focusDigest.drain();
+    if (configStore.get('digestEnabled') !== false && digest.entries.length > 0) {
+      sendToPrimary('digest', { title: 'While you were focused', ...digest });
+    }
     uiState.heldTotal = 0;
     uiState.heldCues = [];
     broadcast('constellation', constellationPayload()); // empty list fades the stars out
   }
   updateTray();
+}
+
+/**
+ * Screen unlock after a long absence: greet the user with what went by.
+ * Short locks (a coffee refill) drain the log silently.
+ */
+function onUnlock() {
+  const { away } = awayTracker.unlock();
+  const digest = awayLog.drain();
+  if (!away || configStore.get('awaySummaryEnabled') === false || digest.entries.length === 0) {
+    return;
+  }
+  broadcastCue({
+    cue: 'glow-bottom',
+    color: accentCss(uiState.accent, 0.7),
+    msg: `${digest.total} update${digest.total === 1 ? '' : 's'} arrived while you were away`,
+    icon: 'alert',
+  });
+  sendToPrimary('digest', { title: 'While you were away', ...digest });
+}
+
+/**
+ * Starts or stops the Teams presence poll to match the feature toggle.
+ * Stopping releases any hold, so cues can never stay muted by a stale state.
+ */
+function syncTeamsPresence() {
+  const wanted = configStore.get('teamsPresenceEnabled') === true;
+  if (wanted && !teamsPresence) {
+    teamsPresence = new TeamsPresenceMonitor({
+      getToken: () => secureStore.getSecret(SECRET_KEYS.outlookToken),
+      onChange: (hold) => {
+        uiState.teamsDnd = hold;
+        onFocusChanged();
+      },
+      onAuthFailure: (message) => deliverCue({
+        cue: 'glow-bottom', color: WARN, msg: message, icon: 'alert',
+      }),
+    });
+    teamsPresence.start();
+  } else if (!wanted && teamsPresence) {
+    teamsPresence.dispose();
+    teamsPresence = null;
+    uiState.teamsDnd = false;
+    onFocusChanged();
+  }
 }
 
 /**
@@ -469,6 +572,15 @@ function initConnectors() {
     }));
   }
 
+  if (configStore.get('githubEnabled') && configStore.get('githubRepo')) {
+    connectorManager.register('github-1', new GitHubConnector({
+      repo: configStore.get('githubRepo'),
+      patKey: SECRET_KEYS.githubPat,
+      secretStore: secureStore,
+      pollIntervalMs: 45 * 1000,
+    }));
+  }
+
   if (configStore.get('outlookEnabled') && configStore.get('outlookEmail')) {
     connectorManager.register('outlook-1', new OutlookConnector({
       tokenKey: SECRET_KEYS.outlookToken,
@@ -488,6 +600,7 @@ function registerIpcHandlers() {
     ...configStore.getAll(),
     // Never return secrets to the renderer; only whether one is stored.
     hasGitlabPat: secureStore.hasSecret(SECRET_KEYS.gitlabPat),
+    hasGithubPat: secureStore.hasSecret(SECRET_KEYS.githubPat),
     hasOutlookToken: secureStore.hasSecret(SECRET_KEYS.outlookToken),
     // Presentation-only extras so the settings UI can match the OS.
     accentColor: accentCss(uiState.accent, 1),
@@ -507,10 +620,16 @@ function registerIpcHandlers() {
       glowSpeed: clampNumber(config.glowSpeed, GLOW_SPEED_MIN, GLOW_SPEED_MAX, GLOW_SPEED_DEFAULT),
       respectFocusAssist: Boolean(config.respectFocusAssist),
       slackTideEnabled: Boolean(config.slackTideEnabled),
+      agentCuesEnabled: Boolean(config.agentCuesEnabled),
+      digestEnabled: Boolean(config.digestEnabled),
+      awaySummaryEnabled: Boolean(config.awaySummaryEnabled),
+      teamsPresenceEnabled: Boolean(config.teamsPresenceEnabled),
       pomodoroEnabled: Boolean(config.pomodoroEnabled),
       pomodoroMinutes: clampNumber(config.pomodoroMinutes, 1, 240, 25),
       gitlabEnabled: Boolean(config.gitlabEnabled),
       gitlabProjectId: String(config.gitlabProjectId ?? '').trim(),
+      githubEnabled: Boolean(config.githubEnabled),
+      githubRepo: String(config.githubRepo ?? '').trim(),
       outlookEnabled: Boolean(config.outlookEnabled),
       outlookEmail: String(config.outlookEmail ?? '').trim(),
     });
@@ -532,6 +651,13 @@ function registerIpcHandlers() {
         || CONNECTOR_CONFIG_KEYS.some((key, i) => configStore.get(key) !== connectorConfigBefore[i])) {
       initConnectors();
     }
+    // A replaced Graph token must revive a presence monitor that stopped
+    // itself after an auth failure.
+    if (secretsChanged && teamsPresence) {
+      teamsPresence.dispose();
+      teamsPresence = null;
+    }
+    syncTeamsPresence();
     syncFocusMonitor();
     onFocusChanged(); // Turning "respect Focus Assist" off must release held cues.
     if (slackTide && configStore.get('slackTideEnabled') === false) {
@@ -547,6 +673,16 @@ function registerIpcHandlers() {
     secureStore.deleteSecret(key);
     initConnectors();
     return { success: true };
+  });
+
+  // The overlay is click-through by default. While the pointer is over the
+  // digest panel the renderer asks for real mouse events, so the panel can be
+  // hovered, scrolled, and closed; leaving the panel restores click-through.
+  ipcMain.on('digest-interactive', (event, interactive) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window && overlayWindows.includes(window)) {
+      window.setIgnoreMouseEvents(interactive !== true, { forward: true });
+    }
   });
 
   ipcMain.handle('send-test-cue', (event, cue) => {
@@ -583,6 +719,18 @@ function main() {
       deliver: deliverFinal,
       getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
     });
+
+    agentAck = new AgentAckWatcher({
+      getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
+      // The renderer fades every beacon and replays its message pill once.
+      onAcknowledge: () => broadcast('agent-ack', {}),
+    });
+
+    syncTeamsPresence();
+
+    // Long locks feed the "while you were away" digest.
+    powerMonitor.on('lock-screen', () => awayTracker.lock());
+    powerMonitor.on('unlock-screen', onUnlock);
 
     connectorManager = new ConnectorManager(deliverCue);
     initConnectors();
@@ -651,7 +799,9 @@ function main() {
     if (webhookServer) webhookServer.close();
     // dispose(), not stop(): stop() would fire a flush cue mid-quit.
     if (focusMonitor) focusMonitor.dispose();
+    if (teamsPresence) teamsPresence.dispose();
     if (slackTide) slackTide.stop();
+    if (agentAck) agentAck.stop();
   });
 }
 

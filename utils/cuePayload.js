@@ -9,15 +9,20 @@
  * every one of them is checked against an allowlist rather than sanitised.
  */
 
-/** Cue names accepted by the renderer. `cue-<name>` must exist in styles.css. */
-const CUE_NAMES = Object.freeze(['glow', 'glow-bottom', 'glow-pulse', 'comet']);
+/**
+ * Cue names accepted by the renderer. `cue-<name>` must exist in styles.css.
+ * `glow-agent` is the persistent corner beacon for coding-agent completions:
+ * unlike the others it does not expire on its own — it breathes until the
+ * user is back at the keyboard (see utils/agentBeacon.js).
+ */
+const CUE_NAMES = Object.freeze(['glow', 'glow-bottom', 'glow-pulse', 'glow-agent', 'comet']);
 
 /**
  * Bundled icons, resolved by the renderer to `assets/icons/<name>.svg`.
  * Keeping this an allowlist of local files means a payload can never point
  * the overlay at a remote URL. Keep in sync with the copy in renderer.js.
  */
-const ICON_NAMES = Object.freeze(['gitlab', 'outlook', 'calendar', 'pomodoro', 'alert']);
+const ICON_NAMES = Object.freeze(['gitlab', 'github', 'outlook', 'calendar', 'pomodoro', 'alert', 'agent']);
 
 const MSG_MAX_LENGTH = 160;
 const REPEATS_MIN = 1;

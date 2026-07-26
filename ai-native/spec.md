@@ -11,7 +11,7 @@ Periphery is a desktop notification layer designed to keep professionals informe
 ### 2. Core Architecture (Local-First Guarantee)
 To satisfy strict enterprise security requirements:
 *   ✅ **No Cloud Backend:** There is no central server processing events. 
-*   ✅ **Direct Polling via PATs:** For cloud services (GitLab today; GitHub 🔭), users provide Personal Access Tokens. The local app polls these APIs directly. Data flows strictly from the third-party service directly to the user's local machine. Tokens are encrypted with the OS credential store via Electron `safeStorage` and persisted as ciphertext in the app's user-data directory (not as individual OS Keychain entries — see README "Encrypted Secret Storage").
+*   ✅ **Direct Polling via PATs:** For cloud services (GitLab and GitHub), users provide Personal Access Tokens. The local app polls these APIs directly. Data flows strictly from the third-party service directly to the user's local machine. Tokens are encrypted with the OS credential store via Electron `safeStorage` and persisted as ciphertext in the app's user-data directory (not as individual OS Keychain entries — see README "Encrypted Secret Storage").
 *   ✅ **Local Webhook Receiver:** The app runs a lightweight, loopback-only HTTP server (`127.0.0.1:49123`) that local scripts and tools can send POST requests to. See [webhooks.md](webhooks.md).
 *   🔭 **Tech Stack:** The production target is Tauri (Rust backend) for a minimal memory footprint. The current PoC is deliberately built on Electron; see [ADR 1](ADR.md) for the decision and the portability constraints it imposes (connectors and validation stay Electron-free).
 
@@ -26,12 +26,16 @@ Moving beyond the original "flying bird" experiment, the system offers a diverse
 *   🔭 **Weather Overlays:** A brief, 3-second gentle rain overlay on the screen, or a ray of sunlight passing through.
 *   ✅ **The Constellation (notification residue):** Cues held during focus mode leave dim twinkling stars in a screen corner — a glanceable "how much happened" without revealing what. *(Added post-spec; see README "Attention-Aware Delivery".)*
 *   ✅ **Slack Tide (pause-timed delivery):** Non-urgent cues wait for a natural typing pause before appearing, capped at 90 s. *(Added post-spec; not a visual cue but a delivery discipline all cues share.)*
+*   ✅ **The Agent Beacon (`glow-agent`):** A persistent corner glow for coding-agent completions that stays until the user is back at the keyboard, then replays its message once. *(Added post-spec; see [agents.md](agents.md).)*
+*   ✅ **Digests:** An expandable end-of-focus digest panel, and a "while you were away" summary after 30+ minute locks. *(Added post-spec; see README "Attention-Aware Delivery".)*
 
 ### 4. Connectors & Individual Productivity (The Triggers)
 Focusing on developer and individual productivity, the app will ship with the following core connectors:
 
-*   ✅ **Local Hook (webhook form):** Any local tool can POST to `127.0.0.1:49123/notify` (see [webhooks.md](webhooks.md)). 🔭 A globally installed `periphery` CLI wrapper (`npm run build && periphery notify --cue=glow ...`) is planned sugar over this endpoint.
-*   ✅ **GitLab:** Polls pipelines on a configured project (success/failure, naming the failing job) and the user's pending todos (review requests, assignments, mentions, approvals). 🔭 GitHub equivalent.
+*   ✅ **Local Hook (webhook form):** Any local tool can POST to `127.0.0.1:49123/notify` (see [webhooks.md](webhooks.md)). ✅ The `periphery` CLI (`cli/periphery.js`: `notify` / `done` / `health`) and a local MCP server for coding agents (`mcp/server.js`) ship as sugar over this endpoint — see [agents.md](agents.md).
+*   ✅ **GitLab:** Polls pipelines on a configured project (success/failure, naming the failing job) and the user's pending todos (review requests, assignments, mentions, approvals).
+*   ✅ **GitHub:** Polls Actions workflow runs on a configured repository plus the user's notifications (review requests, mentions, assignments).
+*   ✅ **Teams presence (Microsoft Graph):** Opt-in; in a call / presenting / DND (including "Focusing") holds ambient cues like focus mode. Fails open on auth errors.
 *   ✅ **Outlook (Microsoft Graph):** Polls unread inbox mail — distinguishing direct 'To' from low-priority 'CC' — and fires a reminder shortly before calendar events start. *(Not in the original spec; added during Phase 2.)*
 *   ✅ **Time & Pomodoro:** Built-in local break reminder timer, configurable 1–240 minutes.
 *   🔭 **Local File Watcher:** Triggers when a specific large file is created or modified (useful for long video renders or database exports).
@@ -51,7 +55,7 @@ The application window is a control center strictly for configuring rules, rathe
 
 ### 6. Next Steps & Development Phases
 1.  ✅ **Phase 1 (Proof of Concept):** Build the local hook (webhook receiver) and the core visual cues (Edge Glow variants and The Comet) to validate the unobtrusive nature of the notifications.
-2.  ✅ **Phase 2 (Connectors):** Implement the local polling engine using PATs — delivered for GitLab and Outlook (GitHub 🔭), on a connector abstraction that never imports Electron.
+2.  ✅ **Phase 2 (Connectors):** Implement the local polling engine using PATs — delivered for GitLab, GitHub, and Outlook, on a connector abstraction that never imports Electron.
 3.  ◐ **Phase 3 (Settings UI):** Build the GUI for configuring connections and cues — basic settings window shipped; the rules engine, connector store, and cue wardrobe remain 🔭.
 
 Directions beyond Phase 3 are collected in [vnext.md](vnext.md).

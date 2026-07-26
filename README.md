@@ -26,9 +26,14 @@ connectors/              Polling plugins; no Electron imports, unit-tested
 utils/cuePayload.js      Allowlist validation for untrusted cue payloads
 utils/win11.js           Accent parsing, attention tiers, DND state mapping
 utils/focusAssist.js     Focus Assist / DND poller (SHQueryUserNotificationState)
+utils/teamsPresence.js   Teams presence poller (Microsoft Graph /me/presence)
 utils/slackTide.js       Hold-until-pause delivery queue (Slack Tide)
+utils/agentBeacon.js     Acknowledgment watcher for persistent agent cues
+utils/digest.js          End-of-focus / while-you-were-away digest bookkeeping
 utils/trayBadge.js       Accent badge-dot compositing for the tray icon
 utils/stores/            Config + encrypted secret persistence
+cli/periphery.js         `periphery` CLI (notify / done / health)
+mcp/server.js            Local MCP server for coding agents (stdio)
 preload*.js              contextBridge APIs
 renderer.js, styles.css  The overlay itself
 website/                 Static landing page (plain HTML/CSS/JS; not part of the app)
@@ -36,8 +41,9 @@ website/                 Static landing page (plain HTML/CSS/JS; not part of the
 
 ### The Connector Engine
 The system relies on a modular `ConnectorManager` that loads specific integrations.
-1.  **Direct API Polling:** Connectors (like GitLab or Outlook) poll APIs directly from your machine. They receive their credentials through an injected secret store rather than importing Electron, which keeps them testable and portable.
+1.  **Direct API Polling:** Connectors (GitLab, GitHub, Outlook) poll APIs directly from your machine. They receive their credentials through an injected secret store rather than importing Electron, which keeps them testable and portable. The GitHub connector watches Actions runs on a repository plus your notifications (review requests, mentions, assignments).
 2.  **The Local Webhook:** Periphery runs a lightweight HTTP server on `http://127.0.0.1:49123`. This lets you trigger notifications from native hooks in your existing developer tools (Git, npm, Docker) without a custom plugin for every tool.
+3.  **Coding agents:** a zero-dependency [MCP server](docs/agents.md) and a `periphery` CLI let Claude Code, Devin, GitHub Copilot, or any script signal completions as ambient light — including the persistent **agent beacon** (below).
 
 ## Windows 11 Integration
 
@@ -56,7 +62,12 @@ Beyond *how* a cue looks, Periphery decides *when* it deserves your eyes:
 *   **Slack Tide.** While you are mid-keystroke-burst, non-urgent cues are held and released in your next natural micro-pause (~6 s without input), spaced out so pills never pile up. Nothing is held longer than 90 seconds, and a burst larger than the queue collapses into a single "+N more" cue. Idle detection uses the OS input-idle timer — no keylogging, just "seconds since last input". Toggleable in Settings.
 *   **The Constellation.** Cues held by focus mode don't vanish into a counter: each leaves a dim, slowly twinkling star near the top-right corner of the screen, tinted with the cue's colour. A glance tells you *how much* happened while you were deep — without telling you *what*, which is exactly the information that breaks flow. When focus ends the stars fade out and a single summary glow reports the tally by source ("5 updates — gitlab 3, outlook 2"). Stars hold still on battery and under the OS reduce-motion preference.
 
-Delivery priority for every cue: focus hold (constellation) → slack tide (wait for a pause) → immediate. Tier 1 cues and meeting reminders always go straight through.
+*   **The end-of-focus digest.** When focus ends you get more than a tally, if you want it: an expandable card on the primary display lists each held update with its source and time. It is the overlay's only interactive surface — the window grants it real mouse events just while the pointer is over it — and it dismisses itself if ignored. Toggleable in Settings.
+*   **"While you were away."** Unlocking after 30+ minutes greets you with the same digest for everything that arrived while the screen was locked, announced by one quiet glow. Toggleable in Settings.
+*   **The agent beacon (`glow-agent`).** Coding-agent completions get their own cue variant: a violet glow breathing in the bottom-right corner that *does not expire* — it waits until you are demonstrably back at the keyboard, then replays its message once and fades. A subtle glow can be missed; the beacon cannot. See [docs/agents.md](docs/agents.md). Toggleable in Settings (off = agent cues render as a normal glow).
+*   **Teams presence sync.** Opt-in: Periphery polls Microsoft Graph `/me/presence`, and being in a call, presenting, or on Do Not Disturb (including Teams "Focusing") holds ambient cues exactly like Focus Assist. Fails open — an expired token can never leave cues muted.
+
+Delivery priority for every cue: focus hold (constellation) → slack tide (wait for a pause) → immediate. Tier 1 cues and meeting reminders always go straight through; agent beacons skip the tide because persistence makes pause-timing moot.
 
 ## The Attention Hierarchy (Visual Cues)
 

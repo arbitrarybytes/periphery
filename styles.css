@@ -144,6 +144,70 @@ body {
 }
 
 /* =========================================
+   Cue: Agent Beacon (glow-agent)
+   -----------------------------------------
+   A persistent, slowly breathing wedge of light in the bottom-right corner,
+   for coding-agent completions. Deliberately a different shape and rhythm
+   from every one-shot glow, and it does NOT expire: renderer.js keeps it
+   until the main process reports the user back at the keyboard (agent-ack),
+   then fades it and replays the message pill once.
+   ========================================= */
+.cue-glow-agent {
+  position: absolute;
+  right: 0;
+  bottom: var(--agent-offset, 0px);
+  width: 360px;
+  height: 360px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 100% 100%,
+    var(--agent-color, rgba(168, 130, 255, 0.85)) 0%,
+    transparent 62%
+  );
+  animation: agent-breathe 6s ease-in-out infinite;
+}
+
+/* A bright anchor dot, so the corner reads as a beacon and not a smudge. */
+.cue-glow-agent::after {
+  content: '';
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 14px 5px var(--agent-color, rgba(168, 130, 255, 0.85));
+}
+
+@keyframes agent-breathe {
+  0% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+  100% { opacity: 0.35; }
+}
+
+.cue-glow-agent.agent-fading {
+  animation: none;
+  transition: opacity 1.4s ease;
+  opacity: 0;
+}
+
+/* A standing animation is the costly part: on battery and under reduced
+   motion the beacon holds still at a visible level. Persistence is the
+   feature; the breathing is decoration. */
+body.eco .cue-glow-agent {
+  animation: none;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cue-glow-agent {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* =========================================
    Cue Text: Kinetic Typography
    ========================================= */
 .cue-text {
@@ -248,6 +312,148 @@ body {
   0% { opacity: 0.25; }
   50% { opacity: 0.6; }
   100% { opacity: 0.25; }
+}
+
+/* =========================================
+   Digest panel
+   -----------------------------------------
+   Expandable card for "while you were focused" / "while you were away".
+   The only interactive surface on the overlay: renderer.js requests real
+   mouse events while the pointer is over it (see digestPointerTracker).
+   Collapsed it shows the header line; hovering expands the list.
+   ========================================= */
+#digest-panel {
+  position: absolute;
+  top: 150px;
+  right: 24px;
+  width: 340px;
+  pointer-events: auto;
+  background: rgba(18, 18, 24, 0.72);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #fff;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+#digest-panel.digest-hiding {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.digest-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.digest-title {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.digest-count {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.digest-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.digest-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.digest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 0;
+  overflow-y: auto;
+  transition: max-height 0.35s ease, margin-top 0.35s ease;
+}
+
+#digest-panel.digest-expanded .digest-list {
+  max-height: 280px;
+  margin-top: 10px;
+}
+
+.digest-list li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.digest-list img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.digest-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dot-color, var(--accent-color));
+  box-shadow: 0 0 6px var(--dot-color, var(--accent-color));
+}
+
+.digest-msg {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.digest-time {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  flex: none;
+}
+
+.digest-more {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  padding-top: 6px;
+}
+
+.digest-hint {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+#digest-panel.digest-expanded .digest-hint {
+  display: none;
+}
+
+body.eco #digest-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(18, 18, 24, 0.92);
 }
 
 /* =========================================

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Coding agent">
+  <!-- A friendly robot head, tinted in the agent violet (utils/palette.js AGENT). -->
+  <rect x="4" y="7" width="16" height="12" rx="3.5" fill="#a882ff"/>
+  <rect x="11" y="3" width="2" height="3" rx="1" fill="#a882ff"/>
+  <circle cx="12" cy="3" r="1.6" fill="#c9b3ff"/>
+  <circle cx="9" cy="13" r="1.8" fill="#241a3d"/>
+  <circle cx="15" cy="13" r="1.8" fill="#241a3d"/>
+  <rect x="9" y="16.4" width="6" height="1.4" rx="0.7" fill="#241a3d"/>
+  <rect x="1.6" y="11" width="1.8" height="4" rx="0.9" fill="#c9b3ff"/>
+  <rect x="20.6" y="11" width="1.8" height="4" rx="0.9" fill="#c9b3ff"/>
+</svg>

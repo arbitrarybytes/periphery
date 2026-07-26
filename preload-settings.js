@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('peripherySettings', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   /** @param {object} config */
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
-  /** @param {'gitlabPat'|'outlookToken'} field */
+  /** @param {'gitlabPat'|'githubPat'|'outlookToken'} field */
   clearSecret: (field) => ipcRenderer.invoke('clear-secret', field),
   /** @param {string} cue */
   sendTestCue: (cue) => ipcRenderer.invoke('send-test-cue', cue),

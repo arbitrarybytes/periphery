@@ -67,6 +67,9 @@ async function loadConfig() {
   $('verboseMode').checked = config.verboseMode !== false;
   $('respectFocusAssist').checked = config.respectFocusAssist !== false;
   $('slackTideEnabled').checked = config.slackTideEnabled !== false;
+  $('digestEnabled').checked = config.digestEnabled !== false;
+  $('awaySummaryEnabled').checked = config.awaySummaryEnabled !== false;
+  $('agentCuesEnabled').checked = config.agentCuesEnabled !== false;
   $('glowRepeats').value = config.glowRepeats ?? REPEATS_DEFAULT;
   $('glowSpeed').value = config.glowSpeed ?? SPEED_DEFAULT;
   renderSpeedLabel();
@@ -77,10 +80,16 @@ async function loadConfig() {
   $('gitlabEnabled').checked = config.gitlabEnabled !== false;
   $('gitlabProjectId').value = config.gitlabProjectId || '';
 
+  $('githubEnabled').checked = config.githubEnabled !== false;
+  $('githubRepo').value = config.githubRepo || '';
+
   $('outlookEnabled').checked = config.outlookEnabled !== false;
   $('outlookEmail').value = config.outlookEmail || '';
+  // Opt-in (needs an extra Graph scope), unlike the default-on toggles above.
+  $('teamsPresenceEnabled').checked = config.teamsPresenceEnabled === true;
 
   renderSecretState('gitlabPatStatus', 'clearGitlabPat', config.hasGitlabPat);
+  renderSecretState('githubPatStatus', 'clearGithubPat', config.hasGithubPat);
   renderSecretState('outlookTokenStatus', 'clearOutlookToken', config.hasOutlookToken);
 }
 
@@ -105,6 +114,9 @@ async function save() {
     glowSpeed,
     respectFocusAssist: $('respectFocusAssist').checked,
     slackTideEnabled: $('slackTideEnabled').checked,
+    digestEnabled: $('digestEnabled').checked,
+    awaySummaryEnabled: $('awaySummaryEnabled').checked,
+    agentCuesEnabled: $('agentCuesEnabled').checked,
 
     pomodoroEnabled: $('pomodoroEnabled').checked,
     pomodoroMinutes,
@@ -113,9 +125,14 @@ async function save() {
     gitlabProjectId: $('gitlabProjectId').value,
     gitlabPat: $('gitlabPat').value, // Secret; blank keeps the existing one
 
+    githubEnabled: $('githubEnabled').checked,
+    githubRepo: $('githubRepo').value,
+    githubPat: $('githubPat').value, // Secret; blank keeps the existing one
+
     outlookEnabled: $('outlookEnabled').checked,
     outlookEmail: $('outlookEmail').value,
     outlookToken: $('outlookToken').value, // Secret; blank keeps the existing one
+    teamsPresenceEnabled: $('teamsPresenceEnabled').checked,
   });
 
   if (!result.success) {
@@ -125,6 +142,7 @@ async function save() {
 
   // Clear the secret inputs so credentials do not linger in the DOM.
   $('gitlabPat').value = '';
+  $('githubPat').value = '';
   $('outlookToken').value = '';
 
   await loadConfig();
@@ -132,7 +150,7 @@ async function save() {
 }
 
 /**
- * @param {'gitlabPat'|'outlookToken'} field
+ * @param {'gitlabPat'|'githubPat'|'outlookToken'} field
  */
 async function clearSecret(field) {
   const result = await window.peripherySettings.clearSecret(field);
@@ -147,6 +165,7 @@ async function clearSecret(field) {
 $('saveBtn').addEventListener('click', save);
 $('glowSpeed').addEventListener('input', renderSpeedLabel);
 $('clearGitlabPat').addEventListener('click', () => clearSecret('gitlabPat'));
+$('clearGithubPat').addEventListener('click', () => clearSecret('githubPat'));
 $('clearOutlookToken').addEventListener('click', () => clearSecret('outlookToken'));
 $('testCueBtn').addEventListener('click', () => window.peripherySettings.sendTestCue('glow-pulse'));
 

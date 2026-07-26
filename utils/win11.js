@@ -44,6 +44,9 @@ const CUE_TIERS = Object.freeze({
   comet: 1,
   'glow-pulse': 2,
   glow: 2,
+  // Agent completions are awareness-class; persistence, not urgency, is what
+  // makes them hard to miss (see utils/agentBeacon.js).
+  'glow-agent': 2,
   'glow-bottom': 3,
 });
 

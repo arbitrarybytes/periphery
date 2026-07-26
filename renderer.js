@@ -6,9 +6,10 @@
  * which remains the source of truth and the authoritative validator.
  */
 
-/** Cues rendered as a `cue-<name>` glow element; comet is handled apart. */
+/** Cues rendered as a `cue-<name>` glow element; comet and the persistent
+ * agent beacon are handled apart. */
 const GLOW_CUES = ['glow', 'glow-bottom', 'glow-pulse'];
-const ICON_NAMES = ['gitlab', 'outlook', 'calendar', 'pomodoro', 'alert'];
+const ICON_NAMES = ['gitlab', 'github', 'outlook', 'calendar', 'pomodoro', 'alert', 'agent'];
 
 const PULSE_DURATION_MS = 1500;
 const BREATHE_DURATION_MS = 4000;
@@ -132,6 +133,42 @@ function triggerText(msg, color, icon) {
   mount(textEl, TEXT_DURATION_MS + ANIMATION_PADDING_MS);
 }
 
+// ---------------------------------------------------------------------------
+// Agent beacon: a persistent corner glow for coding-agent completions. Unlike
+// every other cue it does not expire — it breathes until the main process
+// says the user is demonstrably back at the keyboard ('agent-ack'), at which
+// point the message pill replays once and the beacon fades out.
+// ---------------------------------------------------------------------------
+
+const AGENT_FADE_MS = 1400;
+/** Gap between replayed pills when several beacons are acknowledged at once. */
+const AGENT_REPLAY_STAGGER_MS = 1800;
+
+/** @type {Array<{el: HTMLElement, msg?: string, color?: string, icon?: string, verbose: boolean}>} */
+const agentBeacons = [];
+
+function triggerAgentBeacon(color, msg, icon, verbose) {
+  const beaconEl = document.createElement('div');
+  beaconEl.classList.add('cue-glow-agent');
+  if (color) {
+    beaconEl.style.setProperty('--agent-color', color);
+  }
+  // Stacked beacons offset slightly so two agents finishing reads as two.
+  beaconEl.style.setProperty('--agent-offset', `${(agentBeacons.length % 4) * 14}px`);
+  container.appendChild(beaconEl);
+  agentBeacons.push({ el: beaconEl, msg, color, icon, verbose });
+}
+
+window.periphery.onAgentAck(() => {
+  agentBeacons.splice(0).forEach((beacon, i) => {
+    if (beacon.msg && beacon.verbose) {
+      setTimeout(() => triggerText(beacon.msg, beacon.color, beacon.icon), i * AGENT_REPLAY_STAGGER_MS);
+    }
+    beacon.el.classList.add('agent-fading');
+    setTimeout(() => beacon.el.remove(), AGENT_FADE_MS);
+  });
+});
+
 window.periphery.onCue((payload) => {
   if (payload === null || typeof payload !== 'object') return;
 
@@ -139,6 +176,8 @@ window.periphery.onCue((payload) => {
 
   if (cue === 'comet') {
     triggerComet(color);
+  } else if (cue === 'glow-agent') {
+    triggerAgentBeacon(color, msg, icon, verbose !== false);
   } else if (GLOW_CUES.includes(cue)) {
     triggerGlow(color, cue, clampRepeats(repeats), clampSpeedFactor(speedFactor));
   } else {
@@ -220,6 +259,146 @@ window.periphery.onConstellation((data) => {
   if (data === null || typeof data !== 'object' || !Array.isArray(data.stars)) return;
   renderConstellation(data.stars);
 });
+
+// ---------------------------------------------------------------------------
+// Digest panel: an expandable card listing what was held during focus or what
+// arrived during a long lock. The overlay window is click-through, so while
+// the pointer is over the panel the renderer asks the main process for real
+// mouse events (setDigestInteractive), and releases them on leave/close.
+// ---------------------------------------------------------------------------
+
+/** The panel dismisses itself when ignored; hovering restarts the clock. */
+const DIGEST_AUTO_HIDE_MS = 60 * 1000;
+const DIGEST_FADE_MS = 400;
+
+let digestPanel = null;
+let digestHideTimer = null;
+
+function digestTimeLabel(at) {
+  if (typeof at !== 'number') return '';
+  return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function hideDigest() {
+  if (!digestPanel) return;
+  const panel = digestPanel;
+  digestPanel = null;
+  clearTimeout(digestHideTimer);
+  digestHideTimer = null;
+  document.removeEventListener('mousemove', digestPointerTracker);
+  window.periphery.setDigestInteractive(false);
+  panel.classList.add('digest-hiding');
+  setTimeout(() => panel.remove(), DIGEST_FADE_MS);
+}
+
+function armDigestAutoHide() {
+  clearTimeout(digestHideTimer);
+  digestHideTimer = setTimeout(hideDigest, DIGEST_AUTO_HIDE_MS);
+}
+
+/**
+ * The overlay ignores mouse events (with forwarding), so mousemove still
+ * arrives here. Hit-test the panel and request real events only while the
+ * pointer is over it — anywhere else the overlay must stay click-through.
+ * @param {MouseEvent} event
+ */
+function digestPointerTracker(event) {
+  if (!digestPanel) return;
+  const rect = digestPanel.getBoundingClientRect();
+  const inside = event.clientX >= rect.left - 8 && event.clientX <= rect.right + 8
+    && event.clientY >= rect.top - 8 && event.clientY <= rect.bottom + 8;
+  window.periphery.setDigestInteractive(inside);
+  digestPanel.classList.toggle('digest-expanded', inside);
+  if (inside) armDigestAutoHide();
+}
+
+/**
+ * @param {{title?: string, entries?: Array<object>, total?: number}} data
+ */
+function renderDigest(data) {
+  if (data === null || typeof data !== 'object' || !Array.isArray(data.entries)) return;
+  hideDigest(); // one panel at a time; a new digest replaces the old
+
+  const panel = document.createElement('div');
+  panel.id = 'digest-panel';
+
+  const header = document.createElement('div');
+  header.classList.add('digest-header');
+
+  const title = document.createElement('span');
+  title.classList.add('digest-title');
+  title.textContent = typeof data.title === 'string' ? data.title : 'While you were out';
+  header.appendChild(title);
+
+  const count = document.createElement('span');
+  count.classList.add('digest-count');
+  const total = typeof data.total === 'number' ? data.total : data.entries.length;
+  count.textContent = String(total);
+  header.appendChild(count);
+
+  const close = document.createElement('button');
+  close.classList.add('digest-close');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Dismiss digest');
+  close.textContent = '×';
+  close.addEventListener('click', hideDigest);
+  header.appendChild(close);
+
+  panel.appendChild(header);
+
+  const list = document.createElement('ul');
+  list.classList.add('digest-list');
+  for (const entry of data.entries) {
+    const item = document.createElement('li');
+
+    const src = iconPath(entry.icon);
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      item.appendChild(img);
+    } else {
+      const dot = document.createElement('span');
+      dot.classList.add('digest-dot');
+      if (typeof entry.color === 'string') dot.style.setProperty('--dot-color', entry.color);
+      item.appendChild(dot);
+    }
+
+    const msg = document.createElement('span');
+    msg.classList.add('digest-msg');
+    msg.textContent = typeof entry.msg === 'string' && entry.msg.length > 0
+      ? entry.msg
+      : 'An update arrived';
+    item.appendChild(msg);
+
+    const time = document.createElement('span');
+    time.classList.add('digest-time');
+    time.textContent = digestTimeLabel(entry.at);
+    item.appendChild(time);
+
+    list.appendChild(item);
+  }
+  panel.appendChild(list);
+
+  if (total > data.entries.length) {
+    const more = document.createElement('div');
+    more.classList.add('digest-more');
+    more.textContent = `+${total - data.entries.length} earlier`;
+    panel.appendChild(more);
+  }
+
+  const hint = document.createElement('div');
+  hint.classList.add('digest-hint');
+  hint.textContent = 'hover to expand';
+  panel.appendChild(hint);
+
+  container.appendChild(panel);
+  digestPanel = panel;
+  document.addEventListener('mousemove', digestPointerTracker);
+  armDigestAutoHide();
+}
+
+window.periphery.onDigest(renderDigest);
 
 window.periphery.onTheme((theme) => {
   if (theme === null || typeof theme !== 'object') return;
