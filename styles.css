@@ -1,0 +1,199 @@
+:root {
+  /* Default dark mode / baseline shadows */
+  --glow-shadow-base: inset 0 0 100px var(--glow-color, rgba(0, 255, 0, 0.8));
+  --glow-shadow-pulse-min: inset 0 0 50px var(--glow-color, rgba(0, 255, 0, 0.8));
+  --glow-shadow-pulse-max: inset 0 0 150px var(--glow-color, rgba(0, 255, 0, 0.8));
+  --glow-bottom-gradient: linear-gradient(to top, var(--glow-color, rgba(0, 255, 0, 0.8)), transparent);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Stronger shadows and contrast for light mode */
+    --glow-shadow-base: inset 0 0 200px var(--glow-color, rgba(0, 255, 0, 0.95)), inset 0 0 20px rgba(0,0,0,0.1);
+    --glow-shadow-pulse-min: inset 0 0 100px var(--glow-color, rgba(0, 255, 0, 0.95));
+    --glow-shadow-pulse-max: inset 0 0 300px var(--glow-color, rgba(0, 255, 0, 0.95)), inset 0 0 40px rgba(0,0,0,0.1);
+    
+    /* Make the bottom gradient taller and more opaque in light mode */
+    --glow-bottom-gradient: linear-gradient(to top, var(--glow-color, rgba(0, 255, 0, 0.95)) 0%, rgba(255,255,255,0.2) 20%, transparent 100%);
+  }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: transparent !important;
+  width: 100vw;
+  height: 100vh;
+  /* Ensure the body doesn't block clicks */
+  pointer-events: none; 
+}
+
+#cue-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* =========================================
+   Cue: Edge Glow
+   ========================================= */
+.cue-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  opacity: 0;
+  animation: glow-breathe 4s ease-in-out forwards;
+}
+
+@keyframes glow-breathe {
+  0% { opacity: 0; box-shadow: var(--glow-shadow-base); }
+  20% { opacity: 1; box-shadow: var(--glow-shadow-base); }
+  80% { opacity: 1; box-shadow: var(--glow-shadow-base); }
+  100% { opacity: 0; box-shadow: var(--glow-shadow-base); }
+}
+
+/* =========================================
+   Cue: The Comet
+   ========================================= */
+.cue-comet {
+  position: absolute;
+  top: 50px;
+  left: -200px; /* Start off-screen */
+  width: 150px;
+  height: 2px;
+  background: white;
+  border-radius: 4px;
+  /* Default color tail */
+  box-shadow: -20px 0 30px 10px rgba(0, 200, 255, 0.6);
+  /* Slowed down to 8 seconds for a graceful ambient effect */
+  animation: comet-fly 8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes comet-fly {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(calc(100vw + 400px)); /* Fly off screen right */
+    opacity: 0;
+  }
+}
+
+/* =========================================
+   Cue: Bottom Glow
+   ========================================= */
+.cue-glow-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 200px; /* Increased height for better light mode visibility */
+  box-sizing: border-box;
+  opacity: 0;
+  animation: glow-breathe-bottom 4s ease-in-out forwards;
+  background: var(--glow-bottom-gradient);
+}
+
+@keyframes glow-breathe-bottom {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* =========================================
+   Cue: Pulse Glow
+   ========================================= */
+.cue-glow-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  opacity: 0;
+  animation: glow-pulse 1.5s ease-in-out forwards;
+}
+
+@keyframes glow-pulse {
+  0% { opacity: 0; box-shadow: var(--glow-shadow-pulse-min); }
+  50% { opacity: 1; box-shadow: var(--glow-shadow-pulse-max); }
+  100% { opacity: 0; box-shadow: var(--glow-shadow-pulse-min); }
+}
+
+/* =========================================
+   Cue Text: Kinetic Typography
+   ========================================= */
+.cue-text {
+  position: absolute;
+  bottom: 15%; /* Start slightly higher */
+  left: 50%;
+  transform: translateX(-50%);
+  
+  /* Glassmorphism Effect */
+  background: color-mix(in srgb, var(--text-color, rgba(255,255,255,0.8)) 40%, rgba(15, 15, 15, 0.4));
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid color-mix(in srgb, var(--text-color, rgba(255,255,255,0.8)) 60%, rgba(255, 255, 255, 0.2));
+  
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  
+  /* Tinted shadow */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px color-mix(in srgb, var(--text-color, transparent) 20%, transparent);
+  
+  opacity: 0;
+  animation: text-float 6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Colored dot icon before text */
+.cue-text.has-dot::before {
+  content: '';
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--text-color, white);
+  box-shadow: 0 0 10px var(--text-color, white);
+}
+
+@keyframes text-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 30px) scale(0.95);
+  }
+  15% {
+    opacity: 1; /* Full opacity for the background block */
+    transform: translate(-50%, 0) scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: translate(-50%, -10px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -30px) scale(0.95);
+  }
+}

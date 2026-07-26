@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FlowState Settings</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      padding: 30px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-top: 0;
+      margin-bottom: 24px;
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+    .section {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #fff;
+    }
+    .form-group {
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .form-group.row {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+    label {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #aaa;
+    }
+    input[type="text"], input[type="password"], input[type="number"] {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #0096ff;
+    }
+    button {
+      background: #0096ff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #007acc;
+    }
+    
+    /* Toggle Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+    }
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #444;
+      transition: .4s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #0096ff;
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>FlowState Settings</h1>
+
+  <div class="section">
+    <div class="section-title">General Appearance</div>
+    
+    <div class="form-group row">
+      <label>Verbose Mode (Show Text & Icons)</label>
+      <label class="switch">
+        <input type="checkbox" id="verboseMode">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="form-group row">
+      <label>Glow Repeats (Pulse Count)</label>
+      <input type="number" id="glowRepeats" min="1" max="10" style="width: 60px;">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">GitLab Integration</div>
+    <div class="form-group row">
+      <label>Enable GitLab</label>
+      <label class="switch">
+        <input type="checkbox" id="gitlabEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Project ID</label>
+      <input type="text" id="gitlabProjectId" placeholder="e.g. 12345678">
+    </div>
+    <div class="form-group">
+      <label>Personal Access Token</label>
+      <input type="password" id="gitlabPat" placeholder="Leave blank to keep existing token">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Outlook Integration</div>
+    <div class="form-group row">
+      <label>Enable Outlook</label>
+      <label class="switch">
+        <input type="checkbox" id="outlookEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label>User Email Address</label>
+      <input type="text" id="outlookEmail" placeholder="you@example.com">
+    </div>
+    <div class="form-group">
+      <label>Microsoft Graph Token (For PoC)</label>
+      <input type="password" id="outlookToken" placeholder="Leave blank to keep existing token">
+    </div>
+  </div>
+
+  <div style="text-align: right;">
+    <button id="saveBtn">Save Settings</button>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    // Load initial config
+    ipcRenderer.invoke('get-config').then(config => {
+      document.getElementById('verboseMode').checked = config.verboseMode;
+      document.getElementById('glowRepeats').value = config.glowRepeats || 3;
+      document.getElementById('gitlabEnabled').checked = config.gitlabEnabled !== false;
+      document.getElementById('gitlabProjectId').value = config.gitlabProjectId || '';
+      document.getElementById('outlookEnabled').checked = config.outlookEnabled !== false;
+      document.getElementById('outlookEmail').value = config.outlookEmail || '';
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const config = {
+        verboseMode: document.getElementById('verboseMode').checked,
+        glowRepeats: parseInt(document.getElementById('glowRepeats').value, 10),
+        
+        gitlabEnabled: document.getElementById('gitlabEnabled').checked,
+        gitlabProjectId: document.getElementById('gitlabProjectId').value,
+        gitlabPat: document.getElementById('gitlabPat').value, // Secret
+        
+        outlookEnabled: document.getElementById('outlookEnabled').checked,
+        outlookEmail: document.getElementById('outlookEmail').value,
+        outlookToken: document.getElementById('outlookToken').value, // Secret
+      };
+
+      ipcRenderer.send('save-config', config);
+      
+      const btn = document.getElementById('saveBtn');
+      btn.innerText = 'Saved!';
+      setTimeout(() => btn.innerText = 'Save Settings', 2000);
+    });
+  </script>
+</body>
+</html>
