@@ -1,6 +1,6 @@
 # <img src="assets/icon.svg" width="28" alt="" align="top"> Periphery
 
-**Periphery** (formerly FlowState) is a local-first, unobtrusive notification system designed specifically for deep-work professionals and enterprise developers.
+**Periphery** is a local-first, unobtrusive notification system designed specifically for deep-work professionals and enterprise developers.
 
 Modern chat apps and notification centers are designed to steal your attention. Periphery is designed to protect it. Instead of jarring popups and sounds, it uses ambient, cinematic visual cues (like edge glows and shooting stars) drawn directly over your screen on a transparent canvas. You only notice what matters, exactly when it matters, without losing your train of thought.
 
