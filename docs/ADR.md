@@ -1,5 +1,7 @@
 # Architecture Decision Records (ADRs)
 
+> Naming note: ADRs are historical records and are not rewritten. "FlowState" below is the project's pre-rename name; it refers to what is now **Periphery**.
+
 ## ADR 1: Retaining Electron for Phase 2 Prototyping
 
 **Date:** 2026-07-26
