@@ -14,4 +14,20 @@ contextBridge.exposeInMainWorld('peripherySettings', {
   clearSecret: (field) => ipcRenderer.invoke('clear-secret', field),
   /** @param {string} cue */
   sendTestCue: (cue) => ipcRenderer.invoke('send-test-cue', cue),
+  /**
+   * Live connector-health pushes while the window is open.
+   * @param {(issues: object[]) => void} handler
+   */
+  onConnectorHealth(handler) {
+    ipcRenderer.on('connector-health', (event, issues) => handler(issues));
+  },
+
+  // Projects: same registry and detection the onboarding wizard uses, so
+  // Settings and setup can never show different hook states.
+  listProjects: () => ipcRenderer.invoke('projects-list'),
+  addProject: () => ipcRenderer.invoke('projects-add'),
+  /** @param {string} dir */
+  removeProject: (dir) => ipcRenderer.invoke('projects-remove', dir),
+  /** @param {{dir: string, gitHook?: boolean, npmScripts?: boolean}} options */
+  wireProject: (options) => ipcRenderer.invoke('projects-wire', options),
 });

@@ -7,7 +7,7 @@
  * through Graph as DoNotDisturb, which is exactly the behaviour we want.
  *
  * Requires a Graph token with the delegated `Presence.Read` scope (the same
- * token slot the Outlook connector uses; see docs/agents.md and settings).
+ * token slot the Outlook connector uses; see ai-native/agents.md and settings).
  *
  * Best effort, like the Focus Assist probe: a failed poll keeps the last
  * known state, and an auth failure fails OPEN (hold released) — presence

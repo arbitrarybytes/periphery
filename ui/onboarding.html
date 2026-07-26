@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+                 connect-src ipc: http://ipc.localhost;">
+  <title>Welcome to Periphery</title>
+  <link rel="stylesheet" href="settings.css">
+  <link rel="stylesheet" href="onboarding.css">
+</head>
+<body>
+
+  <header class="titlebar"><span class="titlebar-label">Periphery — Setup</span></header>
+
+  <main class="content">
+
+  <h1>First cue in 60 seconds</h1>
+  <p class="hint intro">
+    Periphery is invisible until something matters. Three small steps and your
+    tools speak light.
+  </p>
+
+  <div class="section">
+    <div class="section-title"><span class="step-no">1</span> See a cue</div>
+    <div class="form-group row">
+      <label>A comet will cross your screen — watch the edges.</label>
+      <button type="button" id="firstCueBtn">Send my first cue</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="step-no">2</span> Wire a project</div>
+    <div class="form-group row">
+      <label>Pick a project folder; Periphery writes the hooks for you.</label>
+      <button type="button" id="pickBtn" class="secondary">Choose folder…</button>
+    </div>
+    <p class="hint" id="pickedPath" hidden></p>
+
+    <div id="detections" hidden>
+      <div class="form-group row detect-row" id="gitRow" hidden>
+        <div>
+          <label for="gitHookOpt">Git repository — <code>post-commit</code> hook</label>
+          <p class="hint" id="gitHint">A quiet green glow on every successful commit.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="gitHookOpt" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="form-group row detect-row" id="npmRow" hidden>
+        <div>
+          <label for="npmOpt">package.json — <code>notify:success</code> / <code>notify:fail</code> scripts</label>
+          <p class="hint" id="npmHint">Chain them: <code>build &amp;&amp; npm run notify:success</code>. (Re-writes package.json with 2-space formatting.)</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="npmOpt" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="form-group detect-row" id="dockerRow" hidden>
+        <label>Docker detected — copy a recipe (nothing to write):</label>
+        <pre id="dockerRecipe" class="recipe"></pre>
+        <button type="button" id="copyDockerBtn" class="secondary">Copy recipe</button>
+      </div>
+
+      <div class="form-group row">
+        <span class="hint" id="applyStatus" role="status"></span>
+        <button type="button" id="applyBtn">Write the hooks</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="step-no">3</span> Bring your agents</div>
+    <p class="hint">
+      Claude Code, Devin, and GitHub Copilot can light a persistent beacon when
+      long tasks finish — see <code>ai-native/agents.md</code> in the Periphery
+      repo. Everything else (GitLab, GitHub, Outlook, Teams presence) lives in
+      Settings, one click from the tray icon.
+    </p>
+  </div>
+
+  <div class="footer">
+    <span class="hint">Reopen any time from the tray → Setup wizard.</span>
+    <button type="button" id="finishBtn">Done</button>
+  </div>
+
+  </main>
+
+  <script src="onboarding.js"></script>
+</body>
+</html>

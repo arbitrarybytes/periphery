@@ -56,6 +56,28 @@
   );
   document.querySelectorAll(".reveal").forEach((el) => revealObserver.observe(el));
 
+  /*
+   * Safety net. The observer only reports threshold *crossings*, so anything
+   * the viewport skips past before its first callback lands never gets marked
+   * and stays at opacity 0 forever — a whole section rendering blank. That
+   * happens on a jump to an anchor, on a fast flick to the bottom, and on a
+   * restored scroll position after reload. This sweeps whatever is actually on
+   * screen and reveals it, which the observer alone cannot guarantee.
+   */
+  const revealVisible = () => {
+    for (const el of document.querySelectorAll(".reveal:not(.in)")) {
+      const box = el.getBoundingClientRect();
+      if (box.top < innerHeight * 0.94 && box.bottom > 0) {
+        el.classList.add("in");
+        revealObserver.unobserve(el);
+      }
+    }
+  };
+  addEventListener("scroll", revealVisible, { passive: true });
+  addEventListener("resize", revealVisible);
+  addEventListener("load", revealVisible);
+  revealVisible();
+
   /* ---------------- Cue engine ---------------- */
 
   function edgeGlow(color, { duration = 2600, spread = 130 } = {}) {
@@ -117,10 +139,58 @@
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
   }
 
+  /**
+   * The agent beacon, demo edition. In the app it never expires — it waits
+   * for you to return to the keyboard. On a web page "return" is meaningless,
+   * so the demo lingers ~12s, then "acknowledges": fades out like the app
+   * does when you're back.
+   */
+  let demoBeacon = null;
+  function agentBeacon() {
+    if (demoBeacon) return; // one at a time, like a real completion
+    const el = document.createElement("div");
+    el.className = "cue-agent-demo";
+    stage.appendChild(el);
+    demoBeacon = el;
+    setTimeout(() => {
+      el.style.transition = "opacity 1.4s ease";
+      el.style.opacity = "0";
+      setTimeout(() => { el.remove(); demoBeacon = null; }, 1500);
+    }, 12000);
+  }
+
+  /**
+   * The blocked beacon, demo edition. It runs the real escalation curve with
+   * the clock compressed — level 1 at 4s and level 2 at 8s instead of 1 and 4
+   * minutes — so a visitor can watch the whole thing in about fifteen seconds.
+   * In the app nothing clears it but an answer.
+   */
+  let demoBlocked = null;
+  function blockedBeacon() {
+    if (demoBlocked) return;
+    const el = document.createElement("div");
+    el.className = "cue-blocked-demo";
+    stage.appendChild(el);
+    demoBlocked = el;
+
+    setTimeout(() => el.classList.add("level-1"), 4000);
+    setTimeout(() => {
+      el.classList.remove("level-1");
+      el.classList.add("level-2");
+    }, 8000);
+    setTimeout(() => {
+      el.style.transition = "opacity 1.2s ease";
+      el.style.opacity = "0";
+      setTimeout(() => { el.remove(); demoBlocked = null; }, 1300);
+    }, 15000);
+  }
+
   const CUES = {
     comet: () => comet(COLORS.t1),
     edge: () => edgeGlow(COLORS.t2),
     bottom: () => bottomGlow(COLORS.t3),
+    beacon: agentBeacon,
+    blocked: blockedBeacon,
   };
 
   document.querySelectorAll("[data-cue]").forEach((btn) =>

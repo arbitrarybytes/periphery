@@ -11,9 +11,39 @@ class ConnectorManager {
    *   recreated when displays change (and on macOS 'activate'); a captured
    *   window reference would silently point at a destroyed window forever.
    */
-  constructor(sendCue) {
+  /**
+   * @param {(issues: Array<{id: string, name: string, status: string, detail: string|null}>) => void} [onHealthChange]
+   *   called with the full issue list on every poller health transition —
+   *   the host surfaces it in the tray and settings.
+   */
+  constructor(sendCue, onHealthChange) {
     this.sendCue = sendCue;
+    this.onHealthChange = onHealthChange;
     this.connectors = new Map();
+  }
+
+  /**
+   * Every connector whose health is not 'ok'. Reconfiguring a connector
+   * recreates it, which is what clears an auth-failed entry.
+   * @returns {Array<{id: string, name: string, status: string, detail: string|null}>}
+   */
+  getHealthIssues() {
+    const issues = [];
+    for (const [id, connector] of this.connectors) {
+      if (connector.health.status !== 'ok') {
+        issues.push({
+          id,
+          name: connector.constructor.name.replace(/Connector$/, ''),
+          status: connector.health.status,
+          detail: connector.health.detail,
+        });
+      }
+    }
+    return issues;
+  }
+
+  _notifyHealth() {
+    if (this.onHealthChange) this.onHealthChange(this.getHealthIssues());
   }
 
   /**
@@ -27,6 +57,7 @@ class ConnectorManager {
     }
 
     connectorInstance.on('trigger-cue', (payload) => this.sendCue(payload));
+    connectorInstance.on('health', () => this._notifyHealth());
 
     this.connectors.set(id, connectorInstance);
     connectorInstance.start();
@@ -42,6 +73,7 @@ class ConnectorManager {
       connector.stop();
       connector.removeAllListeners();
       this.connectors.delete(id);
+      this._notifyHealth();
     }
   }
 

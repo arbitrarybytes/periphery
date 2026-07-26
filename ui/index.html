@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+                 connect-src ipc: http://ipc.localhost;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Periphery Overlay</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Container for all cues -->
+  <div id="cue-container"></div>
+
+  <!-- Adapts Electron's preload bridge and Tauri's event API to one surface.
+       Must load before renderer.js, which assumes window.periphery exists. -->
+  <script src="bridge.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 /**
  * Validation for cue payloads arriving from untrusted sources (the local
  * webhook receiver). Nothing here touches Electron, so it is unit-testable
- * and portable to the eventual Tauri backend (see docs/ADR.md).
+ * and portable to the eventual Tauri backend (see ai-native/ADR.md).
  *
  * The renderer builds CSS values and image sources out of these fields, so
  * every one of them is checked against an allowlist rather than sanitised.
@@ -15,14 +15,34 @@
  * unlike the others it does not expire on its own — it breathes until the
  * user is back at the keyboard (see utils/agentBeacon.js).
  */
-const CUE_NAMES = Object.freeze(['glow', 'glow-bottom', 'glow-pulse', 'glow-agent', 'comet']);
+const CUE_NAMES = Object.freeze([
+  'glow', 'glow-bottom', 'glow-pulse', 'glow-agent', 'glow-blocked', 'comet',
+]);
+
+/**
+ * Cues that carry *state* rather than announcing an event: they are set by a
+ * source and cleared by it (or by the user), instead of expiring on a timer.
+ * `glow-blocked` is the first — an agent waiting for approval stays true until
+ * somebody answers it. See utils/blockedAgents.js.
+ */
+const STATE_CUES = Object.freeze(['glow-blocked']);
+
+/**
+ * Correlation id for state cues, so a source can clear the exact cue it set.
+ * Constrained to an opaque, printable token: it is used as a Map key and
+ * echoed back in payloads, never interpolated into markup or CSS.
+ */
+const REF_MAX_LENGTH = 64;
+const REF_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
 /**
  * Bundled icons, resolved by the renderer to `assets/icons/<name>.svg`.
  * Keeping this an allowlist of local files means a payload can never point
  * the overlay at a remote URL. Keep in sync with the copy in renderer.js.
  */
-const ICON_NAMES = Object.freeze(['gitlab', 'github', 'outlook', 'calendar', 'pomodoro', 'alert', 'agent']);
+const ICON_NAMES = Object.freeze([
+  'gitlab', 'github', 'outlook', 'calendar', 'pomodoro', 'alert', 'agent', 'blocked',
+]);
 
 const MSG_MAX_LENGTH = 160;
 const REPEATS_MIN = 1;
@@ -149,12 +169,39 @@ function sanitizeCuePayload(raw) {
   // pierce focus mode. Only the literal `true` counts.
   if (raw.urgent === true) payload.urgent = true;
 
+  // Correlation id for state cues, so the source can clear what it set.
+  if (isValidRef(raw.ref)) payload.ref = raw.ref;
+
   return payload;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isValidRef(value) {
+  return typeof value === 'string' && REF_PATTERN.test(value);
+}
+
+/**
+ * Validates a resolve request (clearing a state cue).
+ * @param {unknown} raw
+ * @returns {{ref?: string, all: boolean}|null} null when unusable
+ */
+function sanitizeResolvePayload(raw) {
+  if (raw === null || typeof raw !== 'object') return null;
+  if (raw.all === true) return { all: true };
+  if (isValidRef(raw.ref)) return { ref: raw.ref, all: false };
+  return null;
 }
 
 module.exports = {
   CUE_NAMES,
+  STATE_CUES,
   ICON_NAMES,
+  REF_MAX_LENGTH,
+  isValidRef,
+  sanitizeResolvePayload,
   MSG_MAX_LENGTH,
   REPEATS_MIN,
   REPEATS_MAX,

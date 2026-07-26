@@ -2,13 +2,15 @@
 'use strict';
 
 /**
- * `periphery` CLI — thin sugar over the local webhook (see docs/webhooks.md).
+ * `periphery` CLI — thin sugar over the local webhook (see ai-native/webhooks.md).
  * Zero dependencies; requires Node >= 18 for global fetch.
  *
  *   periphery notify --msg "Build finished" [--cue glow-pulse] [--color ...]
  *                    [--icon ...] [--urgent] [--agent]
- *   periphery done ["msg"] [--fail]     # agent-style completion beacon
- *   periphery health                    # what the running build accepts
+ *   periphery done ["msg"] [--fail]      # agent-style completion beacon
+ *   periphery blocked "question" [--ref]  # escalating "waiting on you" beacon
+ *   periphery unblocked [--ref]           # clear it
+ *   periphery health                      # what the running build accepts
  *
  * `done` is built for command chaining and coding agents:
  *   long_build && periphery done "build finished" || periphery done --fail "build failed"
@@ -19,19 +21,23 @@ const DEFAULT_PORT = 49123; // Keep in sync with server/webhookServer.js — thi
 
 const AGENT_COLOR = 'rgba(168, 130, 255, 0.85)'; // utils/palette.js AGENT
 const FAIL_COLOR = 'rgba(255, 0, 50, 0.9)'; // utils/palette.js DANGER
+const BLOCKED_COLOR = 'rgba(255, 122, 89, 0.9)'; // utils/palette.js BLOCKED
 
 const USAGE = `periphery — ambient cues from your terminal
 
 Usage:
   periphery notify --msg "text" [options]   Fire a cue
   periphery done ["msg"] [--fail]           Persistent agent beacon (glow-agent)
+  periphery blocked "question" [--ref id]   Escalating "waiting on you" beacon
+  periphery unblocked [--ref id | --all]    Clear a blocked beacon
   periphery health                          List cues/icons the app accepts
 
 Options:
-  --cue <name>     glow | glow-bottom | glow-pulse | glow-agent | comet
+  --cue <name>     glow | glow-bottom | glow-pulse | glow-agent | glow-blocked | comet
   --msg <text>     Message for the text pill (160 chars max)
   --color <css>    Hex/rgb()/rgba() literal or colour keyword
-  --icon <name>    Bundled icon (gitlab, github, outlook, calendar, pomodoro, alert, agent)
+  --icon <name>    Bundled icon (gitlab, github, outlook, calendar, pomodoro, alert, agent, blocked)
+  --ref <id>       Correlation id for blocked/unblocked
   --urgent         Deliver at the highest tier (pierces focus mode)
   --agent          Shorthand for --cue glow-agent --icon agent
   --port <n>       Webhook port (default ${DEFAULT_PORT}; or PERIPHERY_PORT env)
@@ -44,7 +50,7 @@ Options:
 function parseArgs(argv) {
   const positional = [];
   const flags = {};
-  const valueFlags = new Set(['cue', 'msg', 'color', 'icon', 'port']);
+  const valueFlags = new Set(['cue', 'msg', 'color', 'icon', 'port', 'ref']);
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -78,8 +84,29 @@ function buildRequest({ command, positional, flags }) {
     if (typeof flags.msg === 'string') payload.msg = flags.msg;
     if (typeof flags.color === 'string') payload.color = flags.color;
     if (typeof flags.icon === 'string') payload.icon = flags.icon;
+    if (typeof flags.ref === 'string') payload.ref = flags.ref;
     if (flags.urgent === true) payload.urgent = true;
     return { path: '/notify', payload };
+  }
+
+  if (command === 'blocked') {
+    const payload = {
+      cue: 'glow-blocked',
+      icon: 'blocked',
+      color: BLOCKED_COLOR,
+      msg: positional[0]
+        || (typeof flags.msg === 'string' ? flags.msg : null)
+        || 'An agent is waiting for your approval',
+    };
+    if (typeof flags.ref === 'string') payload.ref = flags.ref;
+    return { path: '/notify', payload };
+  }
+
+  if (command === 'unblocked') {
+    return {
+      path: '/resolve',
+      payload: typeof flags.ref === 'string' ? { ref: flags.ref } : { all: true },
+    };
   }
 
   if (command === 'done') {

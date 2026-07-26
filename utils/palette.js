@@ -20,4 +20,10 @@ module.exports = Object.freeze({
   MEETING: 'rgba(255, 165, 0, 0.8)',
   /** Violet for coding-agent cues, so agent work is recognisable at a glance. */
   AGENT: 'rgba(168, 130, 255, 0.85)',
+  /**
+   * Warm coral for an agent blocked on approval. Deliberately distinct from
+   * the agent violet (this is an ask, not an announcement) and from DANGER red
+   * (nothing is broken — something is waiting).
+   */
+  BLOCKED: 'rgba(255, 122, 89, 0.9)',
 });

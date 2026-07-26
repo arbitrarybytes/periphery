@@ -6,7 +6,7 @@ const path = require('path');
 /**
  * Minimal JSON-file persistence shared by ConfigStore and SecureStore.
  * Deliberately free of Electron imports so both can be unit-tested and
- * ported alongside the connectors (see docs/ADR.md).
+ * ported alongside the connectors (see ai-native/ADR.md).
  */
 class JsonFileStore {
   /**

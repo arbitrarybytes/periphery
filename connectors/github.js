@@ -2,8 +2,11 @@
 
 const BaseConnector = require('./BaseConnector');
 const { INFO, SUCCESS, DANGER } = require('../utils/palette');
+const { version } = require('../package.json');
 
 const API_BASE = 'https://api.github.com';
+/** Identifies the product and edition to GitHub. See ai-native/versioning.md. */
+const USER_AGENT = `periphery/${version} (node edition)`;
 /** Workflow runs fetched per poll. More than 1 so a burst between polls is not lost. */
 const RUN_PAGE_SIZE = 10;
 /** Conclusions that deserve a cue; the rest are marked seen silently. */
@@ -44,8 +47,9 @@ class GitHubConnector extends BaseConnector {
       Authorization: `Bearer ${this.pat}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      // GitHub rejects requests without a User-Agent.
-      'User-Agent': 'periphery-poc',
+      // GitHub rejects requests without a User-Agent. Naming the edition here
+      // means a rate-limit or abuse report identifies which shell made the call.
+      'User-Agent': USER_AGENT,
     };
   }
 

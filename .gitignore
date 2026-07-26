@@ -7,3 +7,6 @@ out/
 .DS_Store
 .vscode/
 .idea/
+src-tauri/target/
+# Derived from build/logo.png by `npm run assets`; the logo is the source.
+build/icon.png

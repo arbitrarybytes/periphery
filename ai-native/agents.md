@@ -15,7 +15,78 @@ Two integration paths, both local-only:
 Both talk to the same loopback receiver (`http://127.0.0.1:49123`, see
 [webhooks.md](webhooks.md)); nothing leaves your machine.
 
-## The agent beacon (`glow-agent`)
+## The two agent cues, and when to use which
+
+| Situation | Cue | Behaviour |
+| --------- | --- | --------- |
+| Task **finished** | `glow-agent` (violet, bottom-**right**) | Persists until you are back at the keyboard, then replays its message once and fades |
+| Agent **blocked on you** | `glow-blocked` (coral, bottom-**left**) | Persists and **escalates with age**; clears only when the agent says it can proceed, or you dismiss it |
+
+They sit in opposite corners and pulse with different rhythms on purpose:
+"done" and "waiting for you" must never be confused at a glance.
+
+## The blocked beacon (`glow-blocked`) — an agent waiting on you
+
+A finished task merely waits to be noticed; the cost of missing it is bounded.
+A **blocked** agent burns wall-clock time on work already in flight, and that
+cost compounds every second. So this cue is the one thing in Periphery that
+gets *more* insistent on its own:
+
+| Age | Level | What you see |
+| --- | ----- | ------------ |
+| 0–60 s | 0 | A quiet coral glow, bottom-left — about as loud as a completion beacon |
+| 1–4 min | 1 | Brighter, larger, faster two-beat rhythm |
+| 4 min+ | 2 | Insistent — and that is the ceiling |
+
+Escalation is **bounded by design**. It never becomes a comet, never makes a
+sound, never covers anything. It rides on three channels at once — brightness,
+size, and rhythm — so it still escalates on battery and under
+`prefers-reduced-motion`, where it holds still at a rising brightness.
+
+Two behaviours that make it correct rather than just "an orange beacon":
+
+*   **Being back at the keyboard does not clear it.** Presence is not approval.
+    It clears when the agent calls `task_unblocked`, when you dismiss it from
+    the tray, or after a one-hour safety timeout (an agent stalled that long is
+    presumed dead, not waiting).
+*   **It pierces focus mode by default.** This is your own delegated work
+    asking for the one thing only you can give — but it pierces *gently*, as an
+    escalating ambient beacon rather than an interruption. Turn off
+    "…even during focus mode" in Settings if you would rather it be held like
+    any other ambient cue.
+
+While anything is blocked, the tray icon carries a **coral** badge dot (it
+outranks the amber connector-health dot — a blocked agent is actively wasting
+time), the tooltip counts them, and a **Dismiss N waiting agents** item appears
+at the top of the tray menu.
+
+**Feature toggles:** Settings → *Summaries & Agents* → "Escalate agents waiting
+on approval" (off = renders as an ordinary completion beacon) and "…even during
+focus mode".
+
+### Using it
+
+```bash
+# MCP (preferred — agents call these directly):
+#   task_blocked   { question: "Approve deleting 3 migration files?", ref: "mig-1" }
+#   task_unblocked { ref: "mig-1" }          # omit ref to clear everything
+
+# CLI:
+periphery blocked "Approve deleting 3 migration files?" --ref mig-1
+periphery unblocked --ref mig-1
+
+# Raw HTTP:
+curl -X POST http://127.0.0.1:49123/notify \
+     -d '{"cue":"glow-blocked","icon":"blocked","ref":"mig-1","msg":"Approve?"}'
+curl -X POST http://127.0.0.1:49123/resolve -d '{"ref":"mig-1"}'
+```
+
+Always pair them. A stale beacon trains the user to ignore real ones — which is
+the only way this feature can fail. Re-calling `task_blocked` with the same
+`ref` refreshes the wording but deliberately **does not reset the clock**, so a
+chatty agent cannot keep itself quiet.
+
+## The completion beacon (`glow-agent`)
 
 Ordinary cues fade after a few seconds — if you are away or deep in another
 window, they are gone. Agent completions use a **different variant of glow**
@@ -40,11 +111,14 @@ agents keep working, nothing becomes special.
 ## MCP server
 
 `mcp/server.js` is a zero-dependency MCP server (stdio transport, Node ≥ 18).
-It exposes two tools:
+It exposes four tools:
 
 *   **`task_complete`** `{ summary, success? }` — lights the persistent agent
     beacon. Use when a delegated task (build, test run, refactor, migration)
     finishes.
+*   **`task_blocked`** `{ question, ref? }` — lights the escalating blocked
+    beacon. Call it the *moment* you start waiting on the user, not later.
+*   **`task_unblocked`** `{ ref? }` — clears it. Omit `ref` to clear all.
 *   **`notify`** `{ message, cue?, color?, urgent? }` — one-shot ambient cue
     for progress worth knowing that needs no acknowledgment.
 
@@ -100,7 +174,9 @@ environment variables needed; set `PERIPHERY_PORT` only if you changed the
 webhook port). Then tell Devin in its playbook or knowledge:
 
 > When a long-running task completes, call the `task_complete` tool from the
-> `periphery` MCP server with a one-line summary.
+> `periphery` MCP server with a one-line summary. Whenever you need my approval
+> or a decision before continuing, call `task_blocked` with the question, and
+> `task_unblocked` once I have answered.
 
 For cloud-hosted Devin sessions the MCP server runs where Devin runs, not
 where you sit — in that case skip MCP and have Devin’s workspace call your
@@ -128,7 +204,9 @@ tools. A workspace instruction (`.github/copilot-instructions.md`) makes use
 automatic:
 
 > After completing any task that took more than a minute, call the
-> `task_complete` tool from the periphery server with a short summary.
+> `task_complete` tool from the periphery server with a short summary. If you
+> are ever waiting on me to approve or decide something, call `task_blocked`
+> first and `task_unblocked` after.
 
 ## CLI
 

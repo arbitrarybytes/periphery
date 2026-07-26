@@ -15,6 +15,9 @@ const DEFAULTS = Object.freeze({
   gitlabEnabled: true,
   gitlabProjectId: '',
   outlookEmail: '',
+  // Folders the user has pointed Periphery at (wizard or Settings). Hook
+  // status is always re-detected from disk — only the paths are stored.
+  projectFolders: [],
 });
 
 class ConfigStore extends JsonFileStore {

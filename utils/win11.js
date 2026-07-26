@@ -4,7 +4,7 @@
  * Windows 11 integration helpers: accent-colour parsing, the attention-tier
  * rules used by focus deferral, and the SHQueryUserNotificationState mapping.
  * Pure functions only — nothing here imports Electron — so the logic stays
- * unit-testable and portable to the eventual Tauri backend (see docs/ADR.md).
+ * unit-testable and portable to the eventual Tauri backend (see ai-native/ADR.md).
  */
 
 /** Windows 11 default accent ("blue"), used when the OS accent is unavailable. */
@@ -47,6 +47,9 @@ const CUE_TIERS = Object.freeze({
   // Agent completions are awareness-class; persistence, not urgency, is what
   // makes them hard to miss (see utils/agentBeacon.js).
   'glow-agent': 2,
+  // A blocked agent is also awareness-class at first sight — it earns its
+  // insistence by *aging*, not by arriving (see utils/blockedAgents.js).
+  'glow-blocked': 2,
   'glow-bottom': 3,
 });
 
