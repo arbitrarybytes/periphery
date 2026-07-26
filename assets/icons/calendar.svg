@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Calendar">
+  <rect x="2" y="4" width="20" height="18" rx="2.5" fill="#f0f2f5"/>
+  <path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h15A2.5 2.5 0 0 1 22 6.5V9H2z" fill="#ff8c00"/>
+  <rect x="6.5" y="1.5" width="2.4" height="5" rx="1.2" fill="#c96a00"/>
+  <rect x="15.1" y="1.5" width="2.4" height="5" rx="1.2" fill="#c96a00"/>
+  <rect x="5.5" y="12" width="4" height="3.2" rx="0.8" fill="#ff8c00"/>
+  <rect x="11" y="12" width="4" height="3.2" rx="0.8" fill="#b9bec7"/>
+  <rect x="5.5" y="17" width="4" height="3.2" rx="0.8" fill="#b9bec7"/>
+  <rect x="11" y="17" width="4" height="3.2" rx="0.8" fill="#b9bec7"/>
+</svg>
