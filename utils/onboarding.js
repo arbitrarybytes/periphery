@@ -161,6 +161,63 @@ function dockerRecipe(port) {
   ].join('\n');
 }
 
+/**
+ * Registered project folders — the single source of truth shared by the
+ * onboarding wizard and the Settings window. "Registered" means Periphery
+ * remembers the folder and reports its hook status; the hooks themselves live
+ * in the folder and are re-detected from disk every time, never cached, so
+ * the two windows can never disagree about what is wired.
+ */
+
+/**
+ * Adds a folder to the registered list. Pure: returns a new list.
+ * @param {unknown} list - current `projectFolders` config value
+ * @param {string} dir
+ * @returns {string[]} deduplicated, with the new folder appended
+ */
+function registerFolder(list, dir) {
+  const folders = Array.isArray(list) ? list.filter((f) => typeof f === 'string') : [];
+  const normalized = path.resolve(dir);
+  // Windows paths are case-insensitive; registering C:\Repo and c:\repo as
+  // two projects would show the same folder twice with the same status.
+  const exists = folders.some(
+    (f) => path.resolve(f).toLowerCase() === normalized.toLowerCase(),
+  );
+  return exists ? folders : [...folders, normalized];
+}
+
+/**
+ * Removes a folder from the registered list. Pure: returns a new list.
+ * Removal only forgets the folder — hooks already written stay in place, and
+ * the UI says so.
+ * @param {unknown} list
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function unregisterFolder(list, dir) {
+  const folders = Array.isArray(list) ? list.filter((f) => typeof f === 'string') : [];
+  const normalized = path.resolve(dir).toLowerCase();
+  return folders.filter((f) => path.resolve(f).toLowerCase() !== normalized);
+}
+
+/**
+ * Fresh detection for every registered folder — what both the Settings
+ * Projects section and the wizard render from.
+ * @param {unknown} list
+ * @returns {Array<ReturnType<typeof detectProject> & {missing: boolean}>}
+ */
+function detectRegistered(list) {
+  const folders = Array.isArray(list) ? list.filter((f) => typeof f === 'string') : [];
+  return folders.map((dir) => {
+    if (!fs.existsSync(dir)) {
+      // A moved or deleted folder is reported, not silently dropped: the user
+      // decides whether to remove it.
+      return { ...detectProject(dir), missing: true };
+    }
+    return { ...detectProject(dir), missing: false };
+  });
+}
+
 module.exports = {
   MARKER,
   detectProject,
@@ -169,4 +226,7 @@ module.exports = {
   notifyScriptCommands,
   addNotifyScripts,
   dockerRecipe,
+  registerFolder,
+  unregisterFolder,
+  detectRegistered,
 };

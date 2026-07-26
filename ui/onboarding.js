@@ -19,19 +19,21 @@ $('pickBtn').addEventListener('click', async () => {
   if (!result) return; // dialog cancelled
   detected = result;
 
-  $('pickedPath').textContent = result.dir;
+  $('pickedPath').textContent = `${result.dir} — registered. It now also appears under Settings → Projects.`;
   $('pickedPath').hidden = false;
   $('detections').hidden = false;
   $('applyStatus').textContent = '';
 
+  // Checkbox semantics: checked = "this folder will have / already has the
+  // hook". Already-wired therefore shows checked+disabled (done), never
+  // unchecked+disabled — which reads as broken rather than complete.
   $('gitRow').hidden = !result.hasGit;
   if (result.hasGit) {
-    const wired = result.hookExists;
-    $('gitHookOpt').checked = !wired;
-    $('gitHookOpt').disabled = wired;
-    $('gitHint').textContent = wired
+    $('gitHookOpt').checked = result.hookIsOurs || !result.hookExists;
+    $('gitHookOpt').disabled = result.hookExists;
+    $('gitHint').textContent = result.hookExists
       ? (result.hookIsOurs
-        ? 'Already wired by Periphery.'
+        ? 'Already wired by Periphery — nothing more to do.'
         : 'A post-commit hook already exists — Periphery never overwrites it. Add the snippet from ai-native/webhooks.md by hand.')
       : 'A quiet green glow on every successful commit.';
   }
@@ -39,9 +41,9 @@ $('pickBtn').addEventListener('click', async () => {
   $('npmRow').hidden = !result.hasPackageJson;
   if (result.hasPackageJson) {
     const wired = result.notifyScriptsPresent;
-    $('npmOpt').checked = !wired;
+    $('npmOpt').checked = true;
     $('npmOpt').disabled = wired;
-    if (wired) $('npmHint').textContent = 'notify scripts already exist — nothing to do.';
+    if (wired) $('npmHint').textContent = 'Already wired — notify scripts exist. Nothing more to do.';
   }
 
   $('dockerRow').hidden = !result.hasDocker;

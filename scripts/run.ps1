@@ -100,10 +100,18 @@ function Test-PortBusy {
 function Stop-Periphery {
     $stopped = @()
 
+    # A process can exit between enumeration and Stop-Process — killing the
+    # Electron main process takes its children with it — so a miss is success,
+    # not an error.
+    function Stop-Quietly {
+        param([int]$ProcessId)
+        try { Stop-Process -Id $ProcessId -Force -ErrorAction Stop } catch {}
+    }
+
     # The Tauri build is a single native process.
     foreach ($proc in @(Get-Process -Name 'periphery' -ErrorAction SilentlyContinue)) {
         $stopped += "periphery (pid $($proc.Id))"
-        Stop-Process -Id $proc.Id -Force
+        Stop-Quietly $proc.Id
     }
 
     # Electron reports itself as 'electron' in a dev run. Match only the ones
@@ -113,7 +121,7 @@ function Stop-Periphery {
         try { $path = $proc.Path } catch { $path = '' }
         if ($path -and $path.StartsWith($RepoRoot, [StringComparison]::OrdinalIgnoreCase)) {
             $stopped += "electron (pid $($proc.Id))"
-            Stop-Process -Id $proc.Id -Force
+            Stop-Quietly $proc.Id
         }
     }
 

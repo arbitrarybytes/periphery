@@ -177,6 +177,25 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Projects &amp; Local Hooks</div>
+    <p class="hint">
+      Folders you have pointed Periphery at &mdash; here or in the setup wizard.
+      Hook status is read from the folder itself every time, so this list and
+      the wizard can never disagree. Removing a folder only forgets it; hooks
+      already written stay in place.
+    </p>
+    <div id="projectList" class="project-list"></div>
+    <p class="hint" id="projectsEmpty" hidden>
+      No project folders yet. Add one and Periphery will detect git, npm, and
+      Docker, then wire ambient cues with one click.
+    </p>
+    <div class="form-group row project-actions">
+      <span class="hint" id="projectStatus" role="status"></span>
+      <button type="button" class="secondary" id="addProjectBtn">Add a project folder&hellip;</button>
+    </div>
+  </div>
+
+  <div class="section">
     <div class="section-title">GitLab Integration</div>
     <div class="form-group row">
       <label for="gitlabEnabled">Enable GitLab</label>

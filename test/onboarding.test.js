@@ -98,3 +98,59 @@ test('malformed package.json is reported, not thrown', () => {
 test('the docker recipe targets the configured port', () => {
   assert.match(dockerRecipe(50000), /127\.0\.0\.1:50000\/notify/);
 });
+
+// ---------------------------------------------------------------------------
+// Registered folders: the shared source of truth for Settings and the wizard
+// ---------------------------------------------------------------------------
+
+const { registerFolder, unregisterFolder, detectRegistered } = require('../utils/onboarding');
+
+test('registering a folder is idempotent and case-insensitive on paths', () => {
+  const dir = tmpProject();
+  const once = registerFolder([], dir);
+  assert.deepEqual(once, [path.resolve(dir)]);
+
+  const twice = registerFolder(once, dir.toUpperCase());
+  assert.equal(twice.length, 1, 'the same path in a different case is the same project');
+
+  const other = tmpProject();
+  assert.equal(registerFolder(twice, other).length, 2);
+});
+
+test('a corrupt projectFolders value registers as if empty', () => {
+  const dir = tmpProject();
+  assert.deepEqual(registerFolder('not-a-list', dir), [path.resolve(dir)]);
+  assert.deepEqual(registerFolder([42, null], dir), [path.resolve(dir)]);
+});
+
+test('unregistering forgets the folder without touching its hooks', () => {
+  const dir = tmpProject({ git: true });
+  applyGitHook(dir, 49123);
+  const list = registerFolder([], dir);
+
+  const after = unregisterFolder(list, dir);
+  assert.deepEqual(after, []);
+  assert.equal(
+    fs.existsSync(path.join(dir, '.git', 'hooks', 'post-commit')),
+    true,
+    'removal only forgets, it never deletes what was written',
+  );
+});
+
+test('detectRegistered reports fresh per-folder status and flags missing folders', () => {
+  const wired = tmpProject({ git: true, hook: postCommitHookScript(49123) });
+  const bare = tmpProject({ pkg: { name: 'x' } });
+  const gone = path.join(os.tmpdir(), 'periphery-never-existed-xyz');
+
+  const report = detectRegistered([wired, bare, gone]);
+  assert.equal(report.length, 3);
+  assert.equal(report[0].hookIsOurs, true, 'status is re-read from disk, not cached');
+  assert.equal(report[1].hasPackageJson, true);
+  assert.equal(report[1].notifyScriptsPresent, false);
+  assert.equal(report[2].missing, true, 'a deleted folder is reported, not dropped');
+
+  // Wiring after registration is visible on the next detection — this is the
+  // "sync" between setup and settings: there is no state to sync, only disk.
+  addNotifyScripts(bare, 49123);
+  assert.equal(detectRegistered([bare])[0].notifyScriptsPresent, true);
+});

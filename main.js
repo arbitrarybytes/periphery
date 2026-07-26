@@ -832,9 +832,28 @@ function registerIpcHandlers() {
     return { success: true };
   });
 
-  // --- Onboarding wizard ---
+  // --- Projects: shared by the onboarding wizard and Settings ---
+  // A picked folder is *registered* (remembered in config); its hook status
+  // is re-detected from disk on every read, so the two windows can never
+  // disagree — there is no cached state to fall out of sync.
 
-  ipcMain.handle('onboarding-pick-project', async (event) => {
+  /** Remembers a folder in `projectFolders`, deduplicated. */
+  function registerProjectFolder(dir) {
+    configStore.setMany({
+      projectFolders: onboarding.registerFolder(configStore.get('projectFolders'), dir),
+    });
+  }
+
+  /** Fresh detection for every registered folder. */
+  function listProjects() {
+    return {
+      projects: onboarding.detectRegistered(configStore.get('projectFolders')),
+      dockerRecipe: onboarding.dockerRecipe(DEFAULT_PORT),
+    };
+  }
+
+  /** Opens the folder dialog, registers the choice, returns its detection. */
+  async function pickAndRegisterProject(event) {
     const window = BrowserWindow.fromWebContents(event.sender);
     const result = await dialog.showOpenDialog(window, {
       title: 'Choose a project folder',
@@ -843,17 +862,20 @@ function registerIpcHandlers() {
     if (result.canceled || result.filePaths.length === 0) return null;
     const dir = result.filePaths[0];
     try {
-      return {
-        ...onboarding.detectProject(dir),
-        dockerRecipe: onboarding.dockerRecipe(DEFAULT_PORT),
-      };
+      const detection = onboarding.detectProject(dir);
+      // Registering on pick — not on apply — is what makes the wizard's
+      // "registered" claim true: the folder is now visible in Settings even
+      // if the user wires nothing today.
+      registerProjectFolder(dir);
+      return { ...detection, dockerRecipe: onboarding.dockerRecipe(DEFAULT_PORT) };
     } catch (err) {
-      console.error('[Onboarding] Detection failed', err);
+      console.error('[Projects] Detection failed', err);
       return null;
     }
-  });
+  }
 
-  ipcMain.handle('onboarding-apply', (event, options) => {
+  /** Writes the requested hooks; returns per-hook results + fresh detection. */
+  function wireProject(options) {
     if (options === null || typeof options !== 'object' || typeof options.dir !== 'string') {
       return {};
     }
@@ -865,10 +887,28 @@ function registerIpcHandlers() {
       if (options.npmScripts === true) {
         results.npmScripts = onboarding.addNotifyScripts(options.dir, DEFAULT_PORT);
       }
+      registerProjectFolder(options.dir);
+      // Fresh detection, so the caller renders what is now on disk rather
+      // than inferring it from the write results.
+      results.detection = onboarding.detectProject(options.dir);
     } catch (err) {
-      console.error('[Onboarding] Apply failed', err);
+      console.error('[Projects] Apply failed', err);
     }
     return results;
+  }
+
+  ipcMain.handle('onboarding-pick-project', pickAndRegisterProject);
+  ipcMain.handle('onboarding-apply', (event, options) => wireProject(options));
+
+  ipcMain.handle('projects-list', () => listProjects());
+  ipcMain.handle('projects-add', pickAndRegisterProject);
+  ipcMain.handle('projects-wire', (event, options) => wireProject(options));
+  ipcMain.handle('projects-remove', (event, dir) => {
+    if (typeof dir !== 'string') return listProjects();
+    configStore.setMany({
+      projectFolders: onboarding.unregisterFolder(configStore.get('projectFolders'), dir),
+    });
+    return listProjects();
   });
 
   ipcMain.handle('onboarding-finish', () => {

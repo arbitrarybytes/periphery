@@ -13,19 +13,35 @@
 //! Validation happens here, once, so every source — webhook, connector, CLI,
 //! MCP — is equally safe.
 
+use crate::agent_beacon::AgentAckWatcher;
 use crate::blocked::BlockedTracker;
 use crate::clock::{Clock, IdleSource};
 use crate::cue::{CuePayload, ResolveRequest, clamp_repeats, glow_speed_factor, sanitize_cue_payload};
 use crate::digest::{AwayTracker, DigestLog};
 use crate::slack_tide::SlackTide;
 use crate::store::ConfigStore;
-use crate::tiers::{HeldCue, cue_tier, should_defer};
+use crate::tiers::{HeldCue, count_held_icons, cue_tier, deferred_summary_cue, should_defer};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 
 /// How many stars the constellation shows before the oldest rolls off.
 pub const CONSTELLATION_MAX: usize = 24;
+
+/// The soft accent used for summary cues. Electron derives this from the live
+/// Windows accent colour; that Win32 read is not wired up yet, so this is the
+/// same signal blue the overlay theme already hardcodes.
+const ACCENT_SOFT: &str = "rgba(56, 197, 255, 0.7)";
+
+/// The digest panel payload: the drained log plus the panel's title, matching
+/// the `{ title, ...digest }` shape the Electron main process sends.
+fn digest_with_title(title: &str, digest: &crate::digest::Digest) -> Value {
+    let mut value = serde_json::to_value(digest).unwrap_or(Value::Null);
+    if let Some(map) = value.as_object_mut() {
+        map.insert("title".into(), json!(title));
+    }
+    value
+}
 
 /// Everything the overlay is told about, in one place. The shell turns these
 /// into Tauri events; keeping them as data makes the pipeline testable without
@@ -41,6 +57,10 @@ pub enum Outbound {
     BlockedAgents(Value),
     /// End-of-focus or "while you were away" panel content.
     Digest(Value),
+    /// The user is demonstrably back at the keyboard: fade every pending
+    /// agent beacon, replaying each one's message pill once. Carries nothing —
+    /// the overlay only needs to know that it happened.
+    AgentAck,
 }
 
 /// Focus state, from the three independent sources that can assert it.
@@ -58,6 +78,7 @@ pub struct Pipeline {
     pub config: ConfigStore,
     pub blocked: BlockedTracker,
     pub tide: SlackTide,
+    pub agent_ack: AgentAckWatcher,
     pub focus_digest: DigestLog,
     pub away_log: DigestLog,
     pub away: AwayTracker,
@@ -71,7 +92,8 @@ impl Pipeline {
         Self {
             config,
             blocked: BlockedTracker::new(Arc::clone(&clock)),
-            tide: SlackTide::new(Arc::clone(&clock), idle),
+            tide: SlackTide::new(Arc::clone(&clock), Arc::clone(&idle)),
+            agent_ack: AgentAckWatcher::new(Arc::clone(&clock), idle),
             focus_digest: DigestLog::new(Arc::clone(&clock)),
             away_log: DigestLog::new(Arc::clone(&clock)),
             away: AwayTracker::new(clock),
@@ -134,11 +156,34 @@ impl Pipeline {
         }
         // Escalation and expiry are age-driven, so they need a tick too.
         if self.blocked.tick() {
-            out.push(Outbound::BlockedAgents(
-                serde_json::to_value(self.blocked.state()).unwrap_or(Value::Null),
-            ));
+            out.push(self.blocked_state());
+        }
+        // The completion beacon fades once the user is demonstrably back.
+        if self.agent_ack.check() {
+            out.push(Outbound::AgentAck);
         }
         out
+    }
+
+    /// Applies a settings save, re-evaluating anything the changed keys gate.
+    ///
+    /// The focus re-check matters: turning `respectFocusAssist` off while
+    /// Windows reports DND must release the held cues *now* — the OS state is
+    /// not going to transition just because the user stopped caring about it,
+    /// so waiting for a transition would strand the stars indefinitely.
+    pub fn apply_config(&mut self, values: impl IntoIterator<Item = (String, Value)>) -> Vec<Outbound> {
+        let was_focused = self.is_focused();
+        self.config.set_many(values);
+        if was_focused && !self.is_focused() {
+            return self.end_focus();
+        }
+        Vec::new()
+    }
+
+    fn blocked_state(&self) -> Outbound {
+        Outbound::BlockedAgents(
+            serde_json::to_value(self.blocked.state()).unwrap_or(Value::Null),
+        )
     }
 
     /// Final delivery: hold for the constellation while focused, broadcast
@@ -177,10 +222,16 @@ impl Pipeline {
     /// Enriches a cue with display preferences and hands it to the overlay.
     fn broadcast(&mut self, payload: CuePayload) -> Outbound {
         let mut out = payload;
-        if out.cue == "glow-agent" && !self.config.get_bool("agentCuesEnabled", true) {
-            // Toggle off: agent cues downgrade to a plain edge glow rather than
-            // disappearing. The notification still happens, just unstickied.
-            out.cue = "glow".to_string();
+        if out.cue == "glow-agent" {
+            if self.config.get_bool("agentCuesEnabled", true) {
+                // A persistent beacon is now on screen; the watcher decides
+                // when the user has demonstrably seen it.
+                self.agent_ack.notify_delivered();
+            } else {
+                // Toggle off: agent cues downgrade to a plain edge glow rather
+                // than disappearing. The notification happens, just unstickied.
+                out.cue = "glow".to_string();
+            }
         }
 
         let mut value = serde_json::to_value(&out).unwrap_or_else(|_| json!({}));
@@ -202,27 +253,39 @@ impl Pipeline {
     }
 
     /// A blocked agent is a *state*, not an event: it persists until resolved
-    /// and gets more insistent with age. It also bypasses the constellation —
-    /// holding it would defeat the point of a cue that exists to be noticed.
+    /// and gets more insistent with age. Mirrors `deliverBlocked` in `main.js`.
     fn deliver_blocked(&mut self, payload: CuePayload) -> Vec<Outbound> {
         if !self.config.get_bool("blockedCuesEnabled", true) {
-            // Toggle off: fall back to a one-shot edge glow so the information
-            // is not lost, just not made persistent.
+            // Toggle off: downgrade to the ordinary completion beacon rather
+            // than dropping it. The agent still gets heard, it just doesn't
+            // escalate — and, being a beacon, it still waits to be seen.
             let mut downgraded = payload;
-            downgraded.cue = "glow".to_string();
-            return vec![self.broadcast(downgraded)];
+            downgraded.cue = "glow-agent".to_string();
+            downgraded.icon = Some("agent".to_string());
+            return self.deliver_final(downgraded);
         }
 
-        // A blocked agent is wasting time right now, so by default it is the
-        // one thing allowed through focus mode.
-        if self.is_focused() && !self.config.get_bool("blockedPiercesFocus", true) {
-            return self.hold_for_constellation(payload);
-        }
-
+        // Track FIRST, whatever focus decides below. A held blocked agent is
+        // still blocked: it must escalate with age and stay resolvable via
+        // `/resolve` — only its announcement waits for focus to end.
         self.blocked.block(&payload);
-        vec![Outbound::BlockedAgents(
-            serde_json::to_value(self.blocked.state()).unwrap_or(Value::Null),
-        )]
+        let state = self.blocked_state();
+
+        // A blocked agent is the user's own delegated work asking for the one
+        // thing only they can give, so by default it pierces focus mode — but
+        // gently: an escalating ambient beacon, never a comet. Users who
+        // disagree can make it respect focus like anything else.
+        let pierces = self.config.get_bool("blockedPiercesFocus", true);
+        if !pierces && should_defer(&payload, self.is_focused()) {
+            let mut out = self.hold_for_constellation(payload);
+            out.push(state);
+            return out;
+        }
+
+        // Skips the slack tide for the same reason the completion beacon does:
+        // it persists anyway, so waiting for a typing pause only adds latency.
+        // The broadcast carries the message pill; the state drives the beacon.
+        vec![state, self.broadcast(payload)]
     }
 
     /// Clears one blocked agent or all of them. Returns how many were cleared
@@ -237,24 +300,38 @@ impl Pipeline {
             }
         };
 
-        let out = vec![Outbound::BlockedAgents(
-            serde_json::to_value(self.blocked.state()).unwrap_or(Value::Null),
-        )];
-        (cleared, out)
+        (cleared, vec![self.blocked_state()])
     }
 
     /// Focus mode ended: dissolve the stars into one quiet summary.
+    /// Mirrors `onFocusChanged` in `main.js`.
     pub fn end_focus(&mut self) -> Vec<Outbound> {
-        let mut out = vec![Outbound::Constellation(json!({ "stars": [], "total": 0 }))];
-        let digest = self.focus_digest.drain();
+        let mut out = Vec::new();
+
+        if self.held_total > 0 {
+            // One ambient glow saying *how much* went by, with a per-source
+            // breakdown — the moment the user can afford to hear it.
+            let summary = deferred_summary_cue(
+                self.held_total,
+                ACCENT_SOFT,
+                Some(&count_held_icons(&self.held)),
+            );
+            out.push(self.broadcast(summary));
+
+            let digest = self.focus_digest.drain();
+            if self.config.get_bool("digestEnabled", true) && digest.total > 0 {
+                out.push(Outbound::Digest(digest_with_title(
+                    "While you were focused",
+                    &digest,
+                )));
+            }
+        }
+
         self.held.clear();
         self.held_total = 0;
+        // An empty list fades the stars out.
+        out.push(Outbound::Constellation(self.constellation()));
 
-        if self.config.get_bool("digestEnabled", true) && digest.total > 0 {
-            out.push(Outbound::Digest(
-                serde_json::to_value(&digest).unwrap_or(Value::Null),
-            ));
-        }
         // Anything the tide was holding is released rather than stranded.
         for payload in self.tide.flush() {
             out.extend(self.deliver_final(payload));
@@ -375,22 +452,37 @@ mod tests {
     }
 
     #[test]
-    fn ending_focus_clears_the_stars_and_emits_one_digest() {
+    fn ending_focus_announces_a_summary_then_a_digest_then_fades_the_stars() {
         let (mut p, _, _) = pipeline();
         p.focus.manual = true;
-        p.deliver(&cue("glow"));
-        p.deliver(&cue("glow-bottom"));
+        p.deliver(&json!({ "cue": "glow", "msg": "a", "icon": "gitlab" }));
+        p.deliver(&json!({ "cue": "glow-bottom", "msg": "b", "icon": "gitlab" }));
 
         p.focus.manual = false;
         let out = p.end_focus();
 
-        assert!(matches!(out[0], Outbound::Constellation(_)));
-        assert_eq!(p.constellation()["total"], json!(0), "stars are dissolved");
-        let digest = out.iter().find(|o| matches!(o, Outbound::Digest(_)));
-        let Some(Outbound::Digest(value)) = digest else {
-            panic!("focus ending must summarise what was held");
+        // Order mirrors main.js: summary cue, digest panel, stars fade.
+        let Outbound::TriggerCue(summary) = &out[0] else {
+            panic!("focus ending must announce a summary glow");
         };
-        assert_eq!(value["total"], json!(2));
+        assert_eq!(summary["cue"], json!("glow-bottom"));
+        assert!(
+            summary["msg"].as_str().unwrap().contains("2 updates"),
+            "the summary counts what was held"
+        );
+        assert!(
+            summary["msg"].as_str().unwrap().contains("gitlab 2"),
+            "with a per-source breakdown"
+        );
+
+        let Outbound::Digest(digest) = &out[1] else {
+            panic!("focus ending must open the digest panel");
+        };
+        assert_eq!(digest["total"], json!(2));
+        assert_eq!(digest["title"], json!("While you were focused"));
+
+        assert!(matches!(out[2], Outbound::Constellation(_)));
+        assert_eq!(p.constellation()["total"], json!(0), "stars are dissolved");
     }
 
     #[test]
@@ -430,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    fn blocked_cues_respect_the_pierce_toggle() {
+    fn blocked_cues_respect_the_pierce_toggle_but_stay_tracked() {
         let (mut p, _, _) = pipeline();
         p.focus.manual = true;
         p.config.set("blockedPiercesFocus", json!(false));
@@ -440,10 +532,27 @@ mod tests {
             matches!(out[0], Outbound::Constellation(_)),
             "the user asked for nothing to pierce focus"
         );
+        // A held blocked agent is still blocked: it must escalate with age and
+        // stay resolvable, exactly as in the Electron edition.
+        assert_eq!(p.blocked.count(), 1, "held is not forgotten");
+        let (cleared, _) = p.resolve(&ResolveRequest { r#ref: Some("a".into()), all: false });
+        assert_eq!(cleared, 1, "and /resolve still finds it");
     }
 
     #[test]
-    fn disabling_blocked_cues_downgrades_rather_than_discards() {
+    fn a_piercing_blocked_cue_carries_its_message_pill_too() {
+        let (mut p, _, _) = pipeline();
+        let out = p.deliver(&json!({ "cue": "glow-blocked", "ref": "a", "msg": "Approve?" }));
+
+        assert!(matches!(out[0], Outbound::BlockedAgents(_)), "state drives the beacon");
+        let Some(Outbound::TriggerCue(pill)) = out.get(1) else {
+            panic!("the announcement pill must broadcast alongside the state");
+        };
+        assert_eq!(pill["msg"], json!("Approve?"));
+    }
+
+    #[test]
+    fn disabling_blocked_cues_downgrades_to_a_completion_beacon() {
         let (mut p, _, _) = pipeline();
         p.config.set("blockedCuesEnabled", json!(false));
 
@@ -451,8 +560,12 @@ mod tests {
         let Outbound::TriggerCue(value) = &out[0] else {
             panic!("expected a downgraded cue, not silence");
         };
-        assert_eq!(value["cue"], json!("glow"));
+        // Matches main.js: the agent still gets heard — as a beacon that waits
+        // to be seen — it just doesn't escalate.
+        assert_eq!(value["cue"], json!("glow-agent"));
+        assert_eq!(value["icon"], json!("agent"));
         assert_eq!(p.blocked.count(), 0, "and nothing is tracked as state");
+        assert_eq!(p.agent_ack.pending(), 1, "the beacon is ack-watched");
     }
 
     #[test]
@@ -532,6 +645,48 @@ mod tests {
 
         let out = p.deliver(&cue("glow"));
         assert!(is_trigger(&out[0]), "no holding when the tide is off");
+    }
+
+    #[test]
+    fn an_agent_beacon_is_acknowledged_once_the_user_is_back() {
+        let (mut p, clock, idle) = pipeline();
+        idle.set(3_600); // the user is away when the agent finishes
+        p.deliver(&json!({ "cue": "glow-agent", "msg": "build done" }));
+        assert_eq!(p.agent_ack.pending(), 1);
+
+        clock.advance(60_000);
+        assert!(
+            !p.tick().contains(&Outbound::AgentAck),
+            "no keyboard, no acknowledgment — however long it takes"
+        );
+
+        idle.set(1); // they are back
+        clock.advance(1_000);
+        assert!(
+            p.tick().contains(&Outbound::AgentAck),
+            "presence after the minimum visible time fades the beacon"
+        );
+        assert_eq!(p.agent_ack.pending(), 0);
+    }
+
+    #[test]
+    fn saving_config_that_ends_focus_releases_the_held_cues() {
+        let (mut p, _, _) = pipeline();
+        p.focus.detected_dnd = true; // Windows says DND, respectFocusAssist defaults on
+        p.deliver(&cue("glow"));
+        assert_eq!(p.constellation()["total"], json!(1), "held under detected DND");
+
+        // The user opts out of Focus Assist in Settings. The OS state will not
+        // transition on its own, so the save itself must flush.
+        let out = p.apply_config([("respectFocusAssist".to_string(), json!(false))]);
+        assert!(
+            out.iter().any(|o| matches!(o, Outbound::TriggerCue(_))),
+            "the summary announces what was held"
+        );
+        assert_eq!(p.constellation()["total"], json!(0), "the stars are released");
+
+        // A save that does not change the focus verdict stays quiet.
+        assert!(p.apply_config([("glowSpeed".to_string(), json!(5))]).is_empty());
     }
 
     #[test]

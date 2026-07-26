@@ -89,6 +89,13 @@ pub fn dispatch(app: &AppHandle, messages: Vec<Outbound>) {
             Outbound::Constellation(p) => ("constellation", p),
             Outbound::BlockedAgents(p) => ("blocked-agents", p),
             Outbound::Digest(p) => ("digest", p),
+            Outbound::AgentAck => {
+                // No payload: the overlay only needs to know it happened.
+                for window in overlay::windows(app) {
+                    let _ = window.emit("agent-ack", ());
+                }
+                continue;
+            }
         };
 
         if matches!(message, Outbound::Digest(_)) {
@@ -284,13 +291,15 @@ fn save_config(app: AppHandle, state: tauri::State<'_, AppState>, config: Value)
     let Some(map) = config.as_object() else {
         return false;
     };
-    {
+    // apply_config re-evaluates focus: a save that turns off
+    // `respectFocusAssist` while the OS reports DND must release the held
+    // cues now, not at the next OS transition (which may never come).
+    let messages = {
         let mut pipeline = state.pipeline.lock().expect("pipeline lock");
-        pipeline
-            .config
-            .set_many(map.iter().map(|(k, v)| (k.clone(), v.clone())));
-    }
-    refresh_tray(&app);
+        pipeline.apply_config(map.iter().map(|(k, v)| (k.clone(), v.clone())))
+    };
+    // dispatch refreshes the tray even when there is nothing to deliver.
+    dispatch(&app, messages);
     true
 }
 

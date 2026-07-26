@@ -198,6 +198,191 @@ async function clearSecret(field) {
   flashStatus('Token removed.');
 }
 
+// ---------------------------------------------------------------------------
+// Projects & local hooks — same registry and detection as the setup wizard.
+// Status is re-read from disk on every render; there is no cached state that
+// could drift out of sync with what the wizard shows.
+// ---------------------------------------------------------------------------
+
+/** Docker recipe text from the last projects-list response. */
+let dockerRecipeText = '';
+
+/**
+ * @param {string} label
+ * @param {{wired?: boolean, note?: string, action?: {label: string, run: () => void}}} state
+ * @returns {HTMLElement}
+ */
+function hookChip(label, state) {
+  const chip = document.createElement('span');
+  chip.className = state.wired ? 'hook-chip wired' : 'hook-chip';
+
+  const name = document.createElement('span');
+  name.textContent = label;
+  chip.appendChild(name);
+
+  if (state.wired) {
+    const tick = document.createElement('span');
+    tick.className = 'tick';
+    tick.textContent = '✓';
+    chip.appendChild(tick);
+  } else if (state.action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = state.action.label;
+    button.addEventListener('click', state.action.run);
+    chip.appendChild(button);
+  } else if (state.note) {
+    const note = document.createElement('span');
+    note.textContent = state.note;
+    chip.appendChild(note);
+  }
+  return chip;
+}
+
+/**
+ * @param {string} message
+ */
+function flashProjectStatus(message) {
+  const status = $('projectStatus');
+  status.textContent = message;
+  setTimeout(() => {
+    if (status.textContent === message) status.textContent = '';
+  }, STATUS_RESET_MS);
+}
+
+/**
+ * @param {string} dir
+ * @param {{gitHook?: boolean, npmScripts?: boolean}} which
+ */
+async function wireHooks(dir, which) {
+  const results = await window.peripherySettings.wireProject({ dir, ...which });
+  const outcome = results.gitHook || results.npmScripts;
+  if (outcome && !outcome.written) {
+    flashProjectStatus(`Skipped: ${outcome.reason}.`);
+  } else if (outcome) {
+    flashProjectStatus('Wired. Status re-read from the folder.');
+  }
+  await loadProjects();
+}
+
+/**
+ * @param {object} project - one detectRegistered() entry
+ * @returns {HTMLElement}
+ */
+function projectRow(project) {
+  const row = document.createElement('div');
+  row.className = 'project-row';
+
+  const head = document.createElement('div');
+  head.className = 'project-head';
+
+  const name = document.createElement('span');
+  name.className = 'project-name';
+  name.textContent = project.dir.split(/[\\/]/).filter(Boolean).pop() || project.dir;
+  head.appendChild(name);
+
+  const path = document.createElement('span');
+  path.className = 'project-path';
+  path.textContent = project.dir;
+  path.title = project.dir;
+  head.appendChild(path);
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'link';
+  remove.textContent = 'Remove';
+  remove.title = 'Forget this folder. Hooks already written stay in place.';
+  remove.addEventListener('click', async () => {
+    const result = await window.peripherySettings.removeProject(project.dir);
+    renderProjects(result);
+    flashProjectStatus('Removed from the list — written hooks were left untouched.');
+  });
+  head.appendChild(remove);
+
+  row.appendChild(head);
+
+  if (project.missing) {
+    const missing = document.createElement('p');
+    missing.className = 'project-missing';
+    missing.textContent = 'Folder not found — moved or deleted?';
+    row.appendChild(missing);
+    return row;
+  }
+
+  const hooks = document.createElement('div');
+  hooks.className = 'project-hooks';
+
+  if (project.hasGit) {
+    if (project.hookIsOurs) {
+      hooks.appendChild(hookChip('git hook', { wired: true }));
+    } else if (project.hookExists) {
+      hooks.appendChild(hookChip('git hook', {
+        note: 'exists — not Periphery’s, left alone',
+      }));
+    } else {
+      hooks.appendChild(hookChip('git hook', {
+        action: { label: 'wire', run: () => wireHooks(project.dir, { gitHook: true }) },
+      }));
+    }
+  }
+
+  if (project.hasPackageJson) {
+    hooks.appendChild(project.notifyScriptsPresent
+      ? hookChip('npm scripts', { wired: true })
+      : hookChip('npm scripts', {
+        action: { label: 'add', run: () => wireHooks(project.dir, { npmScripts: true }) },
+      }));
+  }
+
+  if (project.hasDocker) {
+    hooks.appendChild(hookChip('docker', {
+      action: {
+        label: 'copy recipe',
+        run: async () => {
+          await navigator.clipboard.writeText(dockerRecipeText);
+          flashProjectStatus('Docker recipe copied.');
+        },
+      },
+    }));
+  }
+
+  if (hooks.childElementCount === 0) {
+    hooks.appendChild(hookChip('nothing to wire', {
+      note: 'no git, package.json, or Dockerfile found',
+    }));
+  }
+
+  row.appendChild(hooks);
+  return row;
+}
+
+/**
+ * @param {{projects: object[], dockerRecipe: string}} data
+ */
+function renderProjects(data) {
+  dockerRecipeText = data.dockerRecipe || '';
+  const projects = Array.isArray(data.projects) ? data.projects : [];
+  $('projectList').replaceChildren(...projects.map(projectRow));
+  $('projectsEmpty').hidden = projects.length > 0;
+}
+
+async function loadProjects() {
+  renderProjects(await window.peripherySettings.listProjects());
+}
+
+$('addProjectBtn').addEventListener('click', async () => {
+  const picked = await window.peripherySettings.addProject();
+  if (!picked) return; // dialog cancelled
+  await loadProjects();
+  flashProjectStatus('Folder registered.');
+});
+
+// The wizard may wire hooks while this window is open; re-detect whenever the
+// window comes back to the foreground so the two can never disagree.
+window.addEventListener('focus', () => {
+  loadProjects().catch(() => { /* transient; next focus retries */ });
+});
+
 $('saveBtn').addEventListener('click', save);
 $('glowSpeed').addEventListener('input', renderSpeedLabel);
 $('clearGitlabPat').addEventListener('click', () => clearSecret('gitlabPat'));
@@ -210,4 +395,9 @@ window.peripherySettings.onConnectorHealth(renderHealthBanner);
 loadConfig().catch((err) => {
   console.error('Failed to load settings', err);
   flashStatus('Could not load settings.');
+});
+
+loadProjects().catch((err) => {
+  console.error('Failed to load projects', err);
+  flashProjectStatus('Could not read the project list.');
 });

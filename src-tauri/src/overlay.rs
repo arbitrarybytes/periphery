@@ -122,6 +122,22 @@ fn on_page_load(window: &tauri::WebviewWindow) {
     }
 
     let _ = window.emit_to(window.label(), "set-theme", theme_payload());
+
+    // Re-adopt every piece of *standing* state, not just the theme. Cues are
+    // fire-and-forget, but the constellation and a blocked agent persist — a
+    // rebuilt overlay (display added, DPI change) that misses them would
+    // silently drop a blocked beacon off the screen, and the escalation tick
+    // only re-announces on a level change, so nothing would heal it.
+    let app = window.app_handle();
+    if let Some(state) = app.try_state::<crate::shell::AppState>() {
+        let pipeline = state.pipeline.lock().expect("pipeline lock");
+        let _ = window.emit_to(window.label(), "constellation", pipeline.constellation());
+        if pipeline.blocked.count() > 0 {
+            let blocked = serde_json::to_value(pipeline.blocked.state())
+                .unwrap_or(serde_json::Value::Null);
+            let _ = window.emit_to(window.label(), "blocked-agents", blocked);
+        }
+    }
 }
 
 /// Presentation hints the overlay needs before it can draw anything: the OS

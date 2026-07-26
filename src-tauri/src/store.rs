@@ -138,6 +138,9 @@ pub fn defaults() -> BTreeMap<&'static str, Value> {
         ("githubRepo", json!("")),
         ("outlookEnabled", json!(true)),
         ("outlookEmail", json!("")),
+        // Folders the user has pointed Periphery at (wizard or Settings).
+        // Hook status is always re-detected from disk; only paths are stored.
+        ("projectFolders", json!([])),
         // Off by default: needs a work/school account, which most users
         // signing in with a personal address will not have.
         ("teamsPresenceEnabled", json!(false)),
