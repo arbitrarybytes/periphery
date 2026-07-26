@@ -1,14 +1,24 @@
+'use strict';
+
 const BaseConnector = require('./BaseConnector');
-const secureStore = require('../utils/secureStore');
+
+const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
+/** Unread messages fetched per poll. Sized so a normal burst is not dropped. */
+const MESSAGE_PAGE_SIZE = 25;
+/** Only look far enough ahead to cover the reminder threshold plus one poll. */
+const CALENDAR_LOOKAHEAD_MINUTES = 6;
+const MEETING_REMINDER_MINUTES = 5;
+const OUTLOOK_ICON = 'outlook';
 
 /**
  * Outlook Connector
- * Polls Microsoft Graph API for unread emails and distinguishes between 
- * 'To' vs 'CC' priority.
- * 
+ * Polls Microsoft Graph for unread mail (distinguishing 'To' from 'CC') and
+ * for imminent meetings.
+ *
  * Config expects:
- * - tokenKey: The key used to retrieve the OAuth token from secureStore
- * - userEmail: The email address of the user (to distinguish To vs CC)
+ * - tokenKey: The key used to retrieve the OAuth token from the secret store
+ * - secretStore: Object exposing getSecret(key)
+ * - userEmail: The user's address, used to tell 'To' from 'CC'
  * - pollIntervalMs: How often to check (default 60s)
  */
 class OutlookConnector extends BaseConnector {
@@ -22,20 +32,22 @@ class OutlookConnector extends BaseConnector {
 
   start() {
     super.start();
-    this.token = secureStore.getSecret(this.config.tokenKey);
+    this.token = this.getSecret(this.config.tokenKey);
     if (!this.token) {
-      console.error(`[Outlook] No Token found for key: ${this.config.tokenKey}`);
+      console.error(`[Outlook] No token found for key: ${this.config.tokenKey}`);
+      this.isRunning = false;
       return;
     }
     if (!this.config.userEmail) {
-      console.error(`[Outlook] No userEmail configured.`);
+      console.error('[Outlook] No userEmail configured.');
+      this.isRunning = false;
       return;
     }
-    
-    // Initial fetch to get baseline of current unread emails
-    this._checkEmails(true).then(() => {
-      this._scheduleNext();
-    });
+
+    // Initial fetch so existing unread mail does not all fire at once.
+    this._checkEmails(true)
+      .catch((err) => console.error('[Outlook] Baseline fetch failed', err))
+      .then(() => this._scheduleNext());
   }
 
   stop() {
@@ -49,74 +61,81 @@ class OutlookConnector extends BaseConnector {
   _scheduleNext() {
     if (!this.isRunning) return;
     this.timerId = setTimeout(async () => {
-      await Promise.all([
-        this._checkEmails(false),
-        this._checkCalendar()
-      ]);
+      await Promise.all([this._checkEmails(false), this._checkCalendar()]);
       this._scheduleNext();
     }, this.pollIntervalMs);
   }
 
+  /**
+   * @returns {Promise<Response|null>} null when the request failed or auth was rejected
+   */
+  async _get(pathAndQuery, label) {
+    const response = await fetch(`${GRAPH_BASE}${pathAndQuery}`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+
+    if (this.handleAuthResponse(response, 'Outlook: sign-in expired, re-enter your token')) {
+      return null;
+    }
+    if (!response.ok) {
+      console.error(`[Outlook] Error fetching ${label}: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    return response;
+  }
+
+  /**
+   * @param {Array<{emailAddress?: {address?: string}}>|undefined} recipients
+   * @returns {boolean}
+   */
+  _includesUser(recipients) {
+    if (!Array.isArray(recipients)) return false;
+    const userEmail = this.config.userEmail.toLowerCase();
+    return recipients.some((r) => r.emailAddress?.address?.toLowerCase() === userEmail);
+  }
+
   async _checkEmails(isBaseline = false) {
     try {
-      // Fetch latest 5 unread emails
-      const response = await fetch(`https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages?$filter=isRead eq false&$orderby=receivedDateTime desc&$top=5`, {
-        headers: {
-          'Authorization': `Bearer ${this.token}`
-        }
-      });
-      
-      if (!response.ok) {
-        console.error(`[Outlook] Error fetching emails: ${response.statusText}`);
-        return;
-      }
+      const query = [
+        '$filter=isRead eq false',
+        '$orderby=receivedDateTime desc',
+        `$top=${MESSAGE_PAGE_SIZE}`,
+        '$select=id,from,toRecipients,ccRecipients',
+      ].join('&');
+      const response = await this._get(`/me/mailFolders/Inbox/messages?${query}`, 'emails');
+      if (!response) return;
 
       const data = await response.json();
-      const messages = data.value || [];
+      const messages = Array.isArray(data.value) ? data.value : [];
 
-      for (const msg of messages) {
-        // If it's the baseline run, just record the ID so we ignore existing unread emails
-        if (isBaseline) {
-          this.processedMessageIds.add(msg.id);
-          continue;
-        }
-
-        // Skip if we've already notified about this email
+      // Oldest first so a burst is announced in the order it arrived.
+      for (const msg of [...messages].reverse()) {
         if (this.processedMessageIds.has(msg.id)) continue;
-        
         this.processedMessageIds.add(msg.id);
+        if (isBaseline) continue;
 
-        // Analyze if user is To or CC
-        const isTo = msg.toRecipients && msg.toRecipients.some(r => r.emailAddress.address.toLowerCase() === this.config.userEmail.toLowerCase());
-        const isCc = msg.ccRecipients && msg.ccRecipients.some(r => r.emailAddress.address.toLowerCase() === this.config.userEmail.toLowerCase());
+        const senderName = msg.from?.emailAddress?.name || 'Someone';
 
-        let senderName = msg.from?.emailAddress?.name || 'Someone';
-
-        if (isTo) {
-          // Direct email -> Higher priority notification
+        if (this._includesUser(msg.toRecipients)) {
+          // Addressed directly -> higher priority.
           this.triggerCue({
             cue: 'comet',
             color: 'rgba(0, 150, 255, 0.9)',
             msg: `Email from ${senderName}`,
-            icon: 'https://img.icons8.com/color/48/microsoft-outlook-2019--v2.png'
+            icon: OUTLOOK_ICON,
           });
-        } else if (isCc) {
-          // CC'd email -> Very subtle low-priority notification
+        } else if (this._includesUser(msg.ccRecipients)) {
+          // Merely CC'd -> very subtle, low priority.
           this.triggerCue({
             cue: 'glow-bottom',
             color: 'rgba(100, 100, 100, 0.5)',
             msg: `CC'd by ${senderName}`,
-            icon: 'https://img.icons8.com/color/48/microsoft-outlook-2019--v2.png'
+            icon: OUTLOOK_ICON,
           });
         }
       }
 
-      // Cleanup Set to prevent memory leaks if it gets too large
-      if (this.processedMessageIds.size > 100) {
-        const arr = Array.from(this.processedMessageIds);
-        this.processedMessageIds = new Set(arr.slice(-50));
-      }
-
+      this.processedMessageIds = this.trimSeen(this.processedMessageIds);
     } catch (err) {
       console.error('[Outlook] Email Poll error', err);
     }
@@ -124,55 +143,59 @@ class OutlookConnector extends BaseConnector {
 
   async _checkCalendar() {
     try {
-      // Get meetings from now until 30 minutes from now
       const now = new Date();
-      const end = new Date(now.getTime() + 30 * 60000);
-      
-      const startIso = now.toISOString();
-      const endIso = end.toISOString();
-      
-      const url = `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${startIso}&endDateTime=${endIso}&$orderby=start/dateTime`;
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${this.token}` }
-      });
-      
-      if (!response.ok) {
-        console.error(`[Outlook] Error fetching calendar: ${response.statusText}`);
-        return;
-      }
+      const end = new Date(now.getTime() + CALENDAR_LOOKAHEAD_MINUTES * 60000);
+
+      const query = [
+        `startDateTime=${encodeURIComponent(now.toISOString())}`,
+        `endDateTime=${encodeURIComponent(end.toISOString())}`,
+        '$orderby=start/dateTime',
+        '$select=id,subject,start',
+      ].join('&');
+      const response = await this._get(`/me/calendarView?${query}`, 'calendar');
+      if (!response) return;
 
       const data = await response.json();
-      const events = data.value || [];
+      const events = Array.isArray(data.value) ? data.value : [];
 
       for (const event of events) {
         if (this.notifiedMeetingIds.has(event.id)) continue;
 
-        // Parse UTC start time
-        const eventStart = new Date(event.start.dateTime + 'Z');
-        const timeUntilStartMs = eventStart.getTime() - now.getTime();
-        const minutesUntilStart = timeUntilStartMs / 60000;
+        const eventStart = this._parseEventStart(event.start);
+        if (!eventStart) continue;
 
-        // Check if meeting starts in <= 5 minutes (and hasn't already started long ago)
-        if (minutesUntilStart <= 5 && minutesUntilStart > -1) {
+        const minutesUntilStart = (eventStart.getTime() - now.getTime()) / 60000;
+
+        // Fire once the meeting is imminent, but not for one already under way.
+        if (minutesUntilStart <= MEETING_REMINDER_MINUTES && minutesUntilStart > -1) {
           this.notifiedMeetingIds.add(event.id);
-          
+
           this.triggerCue({
             cue: 'glow-pulse',
-            color: 'rgba(255, 165, 0, 0.8)', // Orange warning
-            msg: `Meeting: ${event.subject} starts in 5 mins`,
-            icon: 'https://img.icons8.com/color/48/event-accepted.png'
+            color: 'rgba(255, 165, 0, 0.8)',
+            msg: `Meeting: ${event.subject} starts in ${Math.max(0, Math.round(minutesUntilStart))} min`,
+            icon: 'calendar',
           });
         }
       }
 
-      // Cleanup meeting ids
-      if (this.notifiedMeetingIds.size > 50) {
-        const arr = Array.from(this.notifiedMeetingIds);
-        this.notifiedMeetingIds = new Set(arr.slice(-20));
-      }
+      this.notifiedMeetingIds = this.trimSeen(this.notifiedMeetingIds);
     } catch (err) {
       console.error('[Outlook] Calendar Poll error', err);
     }
+  }
+
+  /**
+   * Graph returns `{ dateTime, timeZone }` with no offset in the string. We do
+   * not send a Prefer:outlook.timezone header, so the values come back as UTC.
+   * @param {{dateTime?: string, timeZone?: string}|undefined} start
+   * @returns {Date|null}
+   */
+  _parseEventStart(start) {
+    if (!start || typeof start.dateTime !== 'string') return null;
+    const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(start.dateTime);
+    const parsed = new Date(hasZone ? start.dateTime : `${start.dateTime}Z`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 }
 

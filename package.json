@@ -2,12 +2,17 @@
   "name": "flowstate-poc",
   "version": "1.0.0",
   "description": "Proof of concept for FlowState desktop notifications",
+  "license": "UNLICENSED",
+  "private": true,
   "main": "main.js",
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "node --test"
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.19.2"
   },
   "devDependencies": {

@@ -168,6 +168,14 @@ body {
   animation: text-float 6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
+/* Bundled connector icon before text */
+.cue-text-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px; /* Slight curve for square icons */
+  flex: none;
+}
+
 /* Colored dot icon before text */
 .cue-text.has-dot::before {
   content: '';
