@@ -117,10 +117,31 @@
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
   }
 
+  /**
+   * The agent beacon, demo edition. In the app it never expires — it waits
+   * for you to return to the keyboard. On a web page "return" is meaningless,
+   * so the demo lingers ~12s, then "acknowledges": fades out like the app
+   * does when you're back.
+   */
+  let demoBeacon = null;
+  function agentBeacon() {
+    if (demoBeacon) return; // one at a time, like a real completion
+    const el = document.createElement("div");
+    el.className = "cue-agent-demo";
+    stage.appendChild(el);
+    demoBeacon = el;
+    setTimeout(() => {
+      el.style.transition = "opacity 1.4s ease";
+      el.style.opacity = "0";
+      setTimeout(() => { el.remove(); demoBeacon = null; }, 1500);
+    }, 12000);
+  }
+
   const CUES = {
     comet: () => comet(COLORS.t1),
     edge: () => edgeGlow(COLORS.t2),
     bottom: () => bottomGlow(COLORS.t3),
+    beacon: agentBeacon,
   };
 
   document.querySelectorAll("[data-cue]").forEach((btn) =>

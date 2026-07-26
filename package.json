@@ -15,14 +15,45 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "dist": "electron-builder --win",
+    "dist:msix": "electron-builder --win appx"
+  },
+  "build": {
+    "appId": "com.periphery.app",
+    "productName": "Periphery",
+    "files": [
+      "**/*",
+      "!website/**",
+      "!docs/**",
+      "!test/**",
+      "!dist/**",
+      "!.github/**",
+      "!*.md"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "differentialPackage": true
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://updates.periphery.example/stable"
+    }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "express": "^4.19.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "electron": "^31.3.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.8.0",
     "globals": "^17.7.0"
   }

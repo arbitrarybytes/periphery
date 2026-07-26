@@ -57,9 +57,10 @@ The application window is a control center strictly for configuring rules, rathe
 1.  ✅ **Phase 1 (Proof of Concept):** Build the local hook (webhook receiver) and the core visual cues (Edge Glow variants and The Comet) to validate the unobtrusive nature of the notifications.
 2.  ✅ **Phase 2 (Connectors):** Implement the local polling engine using PATs — delivered for GitLab, GitHub, and Outlook, on a connector abstraction that never imports Electron.
 3.  ◐ **Phase 3 (Settings UI):** Build the GUI for configuring connections and cues — basic settings window shipped; the rules engine, connector store, and cue wardrobe remain 🔭.
+4.  ✅ **Phase 4 (Adoption):** First-run onboarding wizard ("first cue in 60 seconds": detects git/`package.json`/Docker and writes the webhook recipes), NSIS installer with start-at-login and delta auto-updates ([ADR 3](ADR.md)), and connector health surfaced as an amber tray badge + live settings banner.
 
-Directions beyond Phase 3 are collected in [vnext.md](vnext.md).
+Directions beyond Phase 4 are collected in [vnext.md](vnext.md).
 
 ### 7. Associated Artifacts
-*   ✅ **Landing page** (`website/`): a static, dependency-free site (plain HTML/CSS/JS, no build step) that presents the core tenets and *demonstrates* the cues in-browser — the page renders a live comet, edge glow, and bottom glow, plus looping Slack Tide and Constellation demos. It honors `prefers-reduced-motion` with the same stationary-fade degradation the app uses. Note: the site loads webfonts and icons8 icons from CDNs; the "no network assets" guarantee applies to the app overlay, not the marketing site.
+*   ✅ **Landing page** (`docs/`, served by GitHub Pages): a static, dependency-free site (plain HTML/CSS/JS, no build step) that presents the core tenets and *demonstrates* the cues in-browser — the page renders a live comet, edge glow, and bottom glow, plus looping Slack Tide and Constellation demos. It honors `prefers-reduced-motion` with the same stationary-fade degradation the app uses. Note: the site loads webfonts and icons8 icons from CDNs; the "no network assets" guarantee applies to the app overlay, not the marketing site.
 *   ✅ **CI** (`.github/workflows/ci.yml`): runs `npm test` and `npm run lint` on a Windows runner.

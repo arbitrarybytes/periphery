@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * `periphery` CLI — thin sugar over the local webhook (see docs/webhooks.md).
+ * `periphery` CLI — thin sugar over the local webhook (see ai-native/webhooks.md).
  * Zero dependencies; requires Node >= 18 for global fetch.
  *
  *   periphery notify --msg "Build finished" [--cue glow-pulse] [--color ...]

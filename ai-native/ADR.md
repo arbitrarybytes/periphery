@@ -45,3 +45,19 @@ The Windows 11 integration holds ambient cues while the user does not want to be
 *   **Accepted because:** cue delivery degrades gracefully (a missed hold means one ambient glow, not a data loss), and the manual tray "Focus mode" toggle covers users who need the hold to be immediate.
 *   **Tauri note:** the Rust port calls `SHQueryUserNotificationState` directly and deletes the PowerShell bridge; `utils/win11.js` logic (tiering, deferral, state mapping) ports as-is.
 
+
+## ADR 3: NSIS via electron-builder for the Installer and Delta Updates
+
+**Date:** 2026-07-26
+**Status:** Accepted
+
+### Context
+Clone-and-`npm start` is the biggest adoption tax. The candidates for a Windows installer with auto-update were: **MSIX/appx** (modern packaging, Store-managed updates, but `electron-updater` cannot self-update an appx outside the Store and per-machine MSIX signing is unforgiving), **Squirrel.Windows** (legacy, effectively unmaintained), and **NSIS via electron-builder** (one-click install, and `electron-updater` differential downloads give the "delta updates" we want from a plain HTTPS file server).
+
+### Decision
+**NSIS via electron-builder** with `electron-updater`: `differentialPackage: true`, background download, quiet install-on-quit. `npm run dist` builds it; `npm run dist:msix` remains available for a future Store submission. The publish feed is a generic HTTPS URL (`build.publish.url` in package.json — a placeholder until a real feed exists).
+
+### Consequences
+*   **Positive:** delta updates with no update server (any static host works); updates are announced as a single ambient cue and install on quit — no dialogs, matching the product's ethos; start-at-login rides on `app.setLoginItemSettings`, guarded to packaged builds.
+*   **Negative:** the build is unsigned until a code-signing certificate (or Azure Trusted Signing) is configured — SmartScreen will warn. Signing config (`win.certificateSubjectName` / `signtoolOptions`) is a release-time addition, not a code change.
+*   **Toggles:** auto-update and start-at-login are user-facing settings (`autoUpdateEnabled`, `startAtLogin`); dev runs (`!app.isPackaged`) never register login items or check feeds.

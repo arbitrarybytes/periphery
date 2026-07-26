@@ -22,11 +22,11 @@
 
 ## 3. Less hassle — friction removal
 
-*   **Onboarding wizard: "first cue in 60 seconds."** Detect git repos, Docker, and package.json scripts; offer one-click generated hooks (the webhooks.md recipes, written for you).
-*   **Installer + autostart + auto-update.** Signed MSIX (or Squirrel) with start-at-login and delta updates; today's clone-and-`npm start` is the single biggest adoption tax.
+*   ✅ *Shipped.* **Onboarding wizard: "first cue in 60 seconds."** Detect git repos, Docker, and package.json scripts; offer one-click generated hooks (the webhooks.md recipes, written for you).
+*   ✅ *Shipped (NSIS, unsigned; see ADR 3).* **Installer + autostart + auto-update.** Signed MSIX (or Squirrel) with start-at-login and delta updates; today's clone-and-`npm start` is the single biggest adoption tax.
 *   **OAuth device-code flow** for Graph and GitLab instead of hand-pasted PATs: fewer steps, scoped tokens, automatic refresh — secrets still land in `safeStorage` ciphertext.
 *   **Optional webhook bearer token.** Keep loopback-only, add an opt-in shared token to narrow the "any local process" surface (docs/webhooks.md threat model), plus named channels with per-channel default colour/icon.
-*   **Connector health in the tray.** Surface failing pollers (auth expired, rate-limited) as a tray badge + settings banner instead of silent log lines.
+*   ✅ *Shipped.* **Connector health in the tray.** Surface failing pollers (auth expired, rate-limited) as a tray badge + settings banner instead of silent log lines.
 *   **Tauri port** ([ADR 1](ADR.md)): production footprint, and the Rust backend calls `SHQueryUserNotificationState` directly — deleting the PowerShell polling bridge and its 45 s latency ([ADR 2](ADR.md)).
 
 ## Suggested vNext slice (one release)

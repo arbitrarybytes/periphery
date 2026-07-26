@@ -1,0 +1,50 @@
+/* Onboarding-only additions on top of settings.css. */
+
+.intro {
+  margin: -12px 0 18px;
+}
+
+.step-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 8px;
+  vertical-align: -4px;
+}
+
+code {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  background: var(--control-hover);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.detect-row {
+  border-top: 1px solid var(--card-border);
+  padding-top: 12px;
+}
+
+.detect-row[hidden] {
+  display: none;
+}
+
+.recipe {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 8px 0;
+}

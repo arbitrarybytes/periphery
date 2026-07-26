@@ -121,6 +121,20 @@
           </button>
         </article>
       </div>
+
+      <aside class="beacon-banner reveal" style="--d:.15s">
+        <div class="beacon-copy">
+          <p class="tier-tag">Special class &middot; Coding agents</p>
+          <h3>The Agent Beacon</h3>
+          <p class="tier-desc">When Claude Code, Devin, or Copilot finishes a long task, a violet
+            glow breathes in the corner &mdash; and <em>doesn&rsquo;t expire</em>. It waits until
+            you&rsquo;re demonstrably back at the keyboard, replays its message once, and fades.
+            A subtle glow can be missed. The beacon cannot.</p>
+        </div>
+        <button class="tier-trigger beacon-trigger" type="button" data-cue="beacon">
+          <span class="trigger-ring" aria-hidden="true"></span>Light the beacon
+        </button>
+      </aside>
     </section>
 
     <!-- ======= 02 · Attention-aware delivery ======= -->
@@ -237,9 +251,12 @@
             they never import Electron, which keeps them unit-tested, portable, and honest.</p>
           <div class="connector-row">
             <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/gitlab.png" alt="GitLab" width="22" height="22" /><span>GitLab</span></div>
+            <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/github.png" alt="GitHub" width="22" height="22" /><span>GitHub</span></div>
             <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/ms-outlook.png" alt="Outlook" width="22" height="22" /><span>Outlook</span></div>
             <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/timer.png" alt="Pomodoro" width="22" height="22" /><span>Pomodoro</span></div>
           </div>
+          <p>Your Teams presence can hold the line too: in a call, presenting, or on Do Not
+            Disturb, ambient cues wait &mdash; read straight from Microsoft Graph, opt-in.</p>
           <p>And for everything else, a lightweight local webhook lets your existing tools
             speak light &mdash; native hooks in Git, npm, or Docker can fire a cue with one
             request. No plugin required, ever.</p>
@@ -248,6 +265,11 @@
             <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/console.png" alt="Terminal" width="22" height="22" /><span>npm scripts</span></div>
             <div class="connector-pill"><img src="https://img.icons8.com/ios/100/e9eef7/docker.png" alt="Docker" width="22" height="22" /><span>docker</span></div>
           </div>
+          <p>And your coding agents speak light natively: a zero-dependency local
+            <span class="mono-chip">MCP server</span> gives Claude Code, Devin, and GitHub
+            Copilot a <span class="mono-chip">task_complete</span> tool that lights the
+            beacon, plus a <span class="mono-chip">periphery</span> CLI for everything else
+            &mdash; <span class="mono-chip">npm test &amp;&amp; periphery done</span>.</p>
         </div>
 
         <figure class="code-panel reveal" style="--d:.2s">
@@ -260,6 +282,38 @@
           <button class="code-run mono" id="codeRun" type="button">&#9655; run it &mdash; watch the edge</button>
         </figure>
       </div>
+    </section>
+
+    <!-- ======= 05 · Zero friction ======= -->
+    <section class="section" id="friction">
+      <p class="section-no reveal">05 &mdash; Zero friction</p>
+      <h2 class="section-title reveal" style="--d:.06s">Calm shouldn&rsquo;t be<br /><em>a chore.</em></h2>
+
+      <div class="friction-grid">
+        <article class="friction-card reveal" style="--d:.08s">
+          <img src="https://img.icons8.com/ios/100/38c5ff/rocket.png" alt="" width="30" height="30" />
+          <h3>First cue in 60 seconds</h3>
+          <p>A first-run wizard detects your git repos, <span class="mono-chip">package.json</span>,
+            and Docker &mdash; then writes the webhook recipes for you: a
+            <span class="mono-chip">post-commit</span> hook, <span class="mono-chip">notify:*</span>
+            scripts, a copyable Docker snippet. It never overwrites anything you wrote.</p>
+        </article>
+        <article class="friction-card reveal" style="--d:.16s">
+          <img src="https://img.icons8.com/ios/100/38c5ff/software-installer.png" alt="" width="30" height="30" />
+          <h3>Installs like an app</h3>
+          <p>One-click installer, start-at-login, and delta auto-updates that download
+            quietly, announce themselves as a single ambient glow, and install when you
+            quit. Never a popup &mdash; even the updater speaks light.</p>
+        </article>
+        <article class="friction-card reveal" style="--d:.24s">
+          <img src="https://img.icons8.com/ios/100/ffb020/error--v1.png" alt="" width="30" height="30" />
+          <h3>Honest about failure</h3>
+          <p>An expired token or a rate-limited API becomes an amber dot on the tray icon
+            with the reason in the tooltip, and a live banner in Settings &mdash; not a
+            silent log line while your cues quietly stop arriving.</p>
+        </article>
+      </div>
+      <p class="friction-foot mono reveal">every behaviour above is a settings toggle &middot; nothing is forced</p>
     </section>
 
     <!-- ======= Windows 11 strip ======= -->

@@ -547,6 +547,85 @@ main { position: relative; z-index: 1; }
   box-shadow: 0 0 8px 1px var(--tier);
 }
 
+/* Agent beacon banner — the fourth, special cue class */
+.beacon-banner {
+  --tier: #a882ff;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-top: 1.3rem;
+  background: linear-gradient(120deg, rgba(168, 130, 255, 0.08), var(--panel) 60%);
+  border: 1px solid rgba(168, 130, 255, 0.25);
+  border-radius: 18px;
+  padding: 1.8rem 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.beacon-banner::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  bottom: -60px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 130, 255, 0.22), transparent 70%);
+  animation: beaconIdle 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes beaconIdle {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.beacon-copy { flex: 1; }
+
+.beacon-copy .tier-tag { color: #a882ff; }
+
+.beacon-copy h3 {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 400;
+  font-style: italic;
+  margin-bottom: 0.8rem;
+}
+
+.beacon-copy .tier-desc { margin-bottom: 0; max-width: 46rem; }
+
+.beacon-copy em { color: var(--ink); }
+
+.beacon-trigger { flex: none; }
+
+/* The demo beacon fired on the page itself: persistent-ish corner glow */
+.cue-agent-demo {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  height: 340px;
+  background: radial-gradient(circle at 100% 100%, rgba(168, 130, 255, 0.75) 0%, transparent 62%);
+  animation: agentBreathe 5s ease-in-out infinite;
+}
+
+.cue-agent-demo::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 12px 4px rgba(168, 130, 255, 0.9);
+}
+
+@keyframes agentBreathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+
 /* ==========================================================================
    02 · Delivery demos
    ========================================================================== */
@@ -924,6 +1003,50 @@ main { position: relative; z-index: 1; }
 .code-run:hover { background: rgba(56, 197, 255, 0.12); }
 
 /* ==========================================================================
+   05 · Zero friction
+   ========================================================================== */
+
+.friction-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.3rem;
+  margin-top: 3rem;
+}
+
+.friction-card {
+  background: linear-gradient(170deg, var(--bg-raise), var(--panel) 70%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 2rem 1.7rem;
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
+
+.friction-card:hover {
+  border-color: var(--line-bright);
+  box-shadow: 0 18px 50px -20px rgba(56, 197, 255, 0.22);
+}
+
+.friction-card img { margin-bottom: 1.1rem; opacity: 0.9; }
+
+.friction-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 450;
+  margin-bottom: 0.6rem;
+}
+
+.friction-card p { color: var(--dim); font-size: 0.95rem; }
+
+.friction-foot {
+  margin-top: 2rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  text-align: center;
+}
+
+/* ==========================================================================
    Windows 11 strip
    ========================================================================== */
 
@@ -1035,13 +1158,15 @@ main { position: relative; z-index: 1; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .marquee-track, .star, .brand-dot, .hint-dot, .caret { animation: none; }
+  .beacon-banner::after, .cue-agent-demo { animation: none; opacity: 0.6; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .const-star { animation: none; }
   .tide-pill { animation: none; }
 }
 
 @media (max-width: 920px) {
-  .tier-grid, .delivery-grid { grid-template-columns: 1fr; }
+  .tier-grid, .delivery-grid, .friction-grid { grid-template-columns: 1fr; }
+  .beacon-banner { flex-direction: column; align-items: flex-start; }
   .connector-grid { grid-template-columns: 1fr; gap: 2rem; }
   .win-grid { grid-template-columns: 1fr 1fr; row-gap: 2rem; }
 }

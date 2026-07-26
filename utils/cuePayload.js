@@ -3,7 +3,7 @@
 /**
  * Validation for cue payloads arriving from untrusted sources (the local
  * webhook receiver). Nothing here touches Electron, so it is unit-testable
- * and portable to the eventual Tauri backend (see docs/ADR.md).
+ * and portable to the eventual Tauri backend (see ai-native/ADR.md).
  *
  * The renderer builds CSS values and image sources out of these fields, so
  * every one of them is checked against an allowlist rather than sanitised.

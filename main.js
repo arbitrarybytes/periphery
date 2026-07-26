@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-  app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, nativeTheme,
+  app, BrowserWindow, dialog, ipcMain, Tray, Menu, nativeImage, nativeTheme,
   powerMonitor, screen, systemPreferences,
 } = require('electron');
 const path = require('path');
@@ -22,6 +22,8 @@ const { SlackTideQueue } = require('./utils/slackTide');
 const { AgentAckWatcher } = require('./utils/agentBeacon');
 const { DigestLog, AwayTracker } = require('./utils/digest');
 const { TeamsPresenceMonitor } = require('./utils/teamsPresence');
+const { createAutoUpdate } = require('./utils/updates');
+const onboarding = require('./utils/onboarding');
 const { WARN } = require('./utils/palette');
 const ConnectorManager = require('./connectors/ConnectorManager');
 const TimeoutConnector = require('./connectors/timeout');
@@ -51,7 +53,12 @@ const IS_WINDOWS = process.platform === 'win32';
 /** @type {BrowserWindow[]} One click-through overlay per display. */
 let overlayWindows = [];
 let settingsWindow = null;
+let onboardingWindow = null;
 let tray = null;
+/** @type {{stop: () => void}|null} */
+let autoUpdate = null;
+/** Current connector issues, mirrored into the tray badge and settings. */
+let connectorHealth = [];
 /** Unbadged tray icon, kept so the badge can be re-composited or removed. */
 let trayBaseIcon = null;
 let connectorManager = null;
@@ -454,9 +461,43 @@ function createSettingsWindow() {
   });
 }
 
+/** First-run wizard: detect a project, write the webhook recipes, first cue. */
+function createOnboardingWindow() {
+  if (onboardingWindow && !onboardingWindow.isDestroyed()) {
+    onboardingWindow.focus();
+    return;
+  }
+  onboardingWindow = new BrowserWindow({
+    width: 620,
+    height: 720,
+    minWidth: 520,
+    minHeight: 560,
+    title: 'Welcome to Periphery',
+    autoHideMenuBar: true,
+    show: false,
+    ...(IS_WINDOWS ? {
+      backgroundMaterial: 'mica',
+      titleBarStyle: 'hidden',
+      titleBarOverlay: titleBarOverlayOptions(),
+    } : {}),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-onboarding.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  onboardingWindow.once('ready-to-show', () => onboardingWindow.show());
+  onboardingWindow.loadFile('onboarding.html');
+  onboardingWindow.on('closed', () => {
+    onboardingWindow = null;
+  });
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     { label: 'Settings', click: createSettingsWindow },
+    { label: 'Setup wizard', click: createOnboardingWindow },
     {
       label: 'Focus mode',
       type: 'checkbox',
@@ -477,16 +518,23 @@ function buildTrayMenu() {
   ]);
 }
 
-/** Badged variant of the tray icon, composited lazily; reset on accent change. */
-let trayBadgedIcon = null;
-/** Whether the tray currently shows the badge, so setImage runs on transitions only. */
-let trayShowsBadge = false;
+/** Amber, matching the WARN cue colour: something needs the user's attention. */
+const HEALTH_BADGE_COLOR = Object.freeze({ r: 255, g: 176, b: 32 });
 
-function badgedTrayIcon() {
-  if (!trayBadgedIcon) {
+/** Badged tray icon cache: one composite per badge kind, reset on accent change. */
+let trayBadgedIcon = null;
+let trayBadgedKind = null;
+/** Which badge the tray currently shows ('held' | 'health' | null). */
+let trayBadgeKind = null;
+
+/** @param {'held'|'health'} kind */
+function badgedTrayIcon(kind) {
+  if (!trayBadgedIcon || trayBadgedKind !== kind) {
+    trayBadgedKind = kind;
     const { width, height } = trayBaseIcon.getSize();
     trayBadgedIcon = nativeImage.createFromBitmap(
-      drawBadgeDot(trayBaseIcon.toBitmap(), width, height, uiState.accent),
+      drawBadgeDot(trayBaseIcon.toBitmap(), width, height,
+        kind === 'health' ? HEALTH_BADGE_COLOR : uiState.accent),
       { width, height },
     );
   }
@@ -496,39 +544,52 @@ function badgedTrayIcon() {
 /** Re-composites the badge (if shown) after the OS accent colour changes. */
 function refreshTrayBadge() {
   trayBadgedIcon = null;
-  if (tray && trayShowsBadge) {
+  if (tray && trayBadgeKind) {
     try {
-      tray.setImage(badgedTrayIcon());
+      tray.setImage(badgedTrayIcon(trayBadgeKind));
     } catch (err) {
       console.error('[Tray] Could not composite badge dot', err);
     }
   }
 }
 
+function healthBadgeWanted() {
+  return connectorHealth.length > 0 && configStore.get('healthBadgeEnabled') !== false;
+}
+
 /**
- * Keeps the tray truthful: a tooltip that says what Periphery is doing, and
- * an accent-coloured badge dot while cues are being held. The context menu is
- * static after createTray — the checkbox manages its own checked state.
+ * Keeps the tray truthful: a tooltip that says what Periphery is doing, an
+ * accent badge dot while cues are held, and an amber one while a connector
+ * needs attention (health outranks held — a broken poller means cues are
+ * being missed, not merely deferred). The context menu is static after
+ * createTray — the checkbox manages its own checked state.
  */
 function updateTray() {
   if (!tray) return;
 
   const held = uiState.heldTotal;
-  tray.setToolTip(isFocused()
+  let tooltip = isFocused()
     ? `Periphery — focus mode${held > 0 ? `, ${held} update${held === 1 ? '' : 's'} held` : ''}`
-    : 'Periphery — watching');
+    : 'Periphery — watching';
+  if (healthBadgeWanted()) {
+    const first = connectorHealth[0];
+    tooltip += `\n${connectorHealth.length === 1
+      ? first.detail || `${first.name} needs attention`
+      : `${connectorHealth.length} connectors need attention`}`;
+  }
+  tray.setToolTip(tooltip);
 
   if (!trayBaseIcon || trayBaseIcon.isEmpty()) return;
-  const wantBadge = held > 0;
-  if (wantBadge === trayShowsBadge) return;
-  trayShowsBadge = wantBadge;
+  const wantKind = healthBadgeWanted() ? 'health' : (held > 0 ? 'held' : null);
+  if (wantKind === trayBadgeKind) return;
+  trayBadgeKind = wantKind;
   try {
-    tray.setImage(wantBadge ? badgedTrayIcon() : trayBaseIcon);
+    tray.setImage(wantKind ? badgedTrayIcon(wantKind) : trayBaseIcon);
   } catch (err) {
     // The badge is decoration; never let it take the tray icon down with it.
     console.error('[Tray] Could not composite badge dot', err);
     tray.setImage(trayBaseIcon);
-    trayShowsBadge = false;
+    trayBadgeKind = null;
   }
 }
 
@@ -605,6 +666,8 @@ function registerIpcHandlers() {
     // Presentation-only extras so the settings UI can match the OS.
     accentColor: accentCss(uiState.accent, 1),
     isWindows: IS_WINDOWS,
+    isPackaged: app.isPackaged,
+    connectorHealth,
   }));
 
   ipcMain.handle('save-config', (event, config) => {
@@ -620,6 +683,9 @@ function registerIpcHandlers() {
       glowSpeed: clampNumber(config.glowSpeed, GLOW_SPEED_MIN, GLOW_SPEED_MAX, GLOW_SPEED_DEFAULT),
       respectFocusAssist: Boolean(config.respectFocusAssist),
       slackTideEnabled: Boolean(config.slackTideEnabled),
+      startAtLogin: Boolean(config.startAtLogin),
+      autoUpdateEnabled: Boolean(config.autoUpdateEnabled),
+      healthBadgeEnabled: Boolean(config.healthBadgeEnabled),
       agentCuesEnabled: Boolean(config.agentCuesEnabled),
       digestEnabled: Boolean(config.digestEnabled),
       awaySummaryEnabled: Boolean(config.awaySummaryEnabled),
@@ -659,7 +725,9 @@ function registerIpcHandlers() {
     }
     syncTeamsPresence();
     syncFocusMonitor();
+    applyLoginItemSetting();
     onFocusChanged(); // Turning "respect Focus Assist" off must release held cues.
+    updateTray(); // The health-badge toggle may have changed.
     if (slackTide && configStore.get('slackTideEnabled') === false) {
       slackTide.flush(); // Turning slack tide off must release its queue too.
     }
@@ -672,6 +740,51 @@ function registerIpcHandlers() {
 
     secureStore.deleteSecret(key);
     initConnectors();
+    return { success: true };
+  });
+
+  // --- Onboarding wizard ---
+
+  ipcMain.handle('onboarding-pick-project', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(window, {
+      title: 'Choose a project folder',
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const dir = result.filePaths[0];
+    try {
+      return {
+        ...onboarding.detectProject(dir),
+        dockerRecipe: onboarding.dockerRecipe(DEFAULT_PORT),
+      };
+    } catch (err) {
+      console.error('[Onboarding] Detection failed', err);
+      return null;
+    }
+  });
+
+  ipcMain.handle('onboarding-apply', (event, options) => {
+    if (options === null || typeof options !== 'object' || typeof options.dir !== 'string') {
+      return {};
+    }
+    const results = {};
+    try {
+      if (options.gitHook === true) {
+        results.gitHook = onboarding.applyGitHook(options.dir, DEFAULT_PORT);
+      }
+      if (options.npmScripts === true) {
+        results.npmScripts = onboarding.addNotifyScripts(options.dir, DEFAULT_PORT);
+      }
+    } catch (err) {
+      console.error('[Onboarding] Apply failed', err);
+    }
+    return results;
+  });
+
+  ipcMain.handle('onboarding-finish', () => {
+    configStore.setMany({ onboardingDone: true });
+    if (onboardingWindow && !onboardingWindow.isDestroyed()) onboardingWindow.close();
     return { success: true };
   });
 
@@ -695,6 +808,20 @@ function registerIpcHandlers() {
     });
     return { success: true };
   });
+}
+
+/**
+ * Start-at-login, from the feature toggle. Only meaningful in a packaged
+ * build — registering a dev electron.exe at login would be a trap.
+ */
+function applyLoginItemSetting() {
+  if (!app.isPackaged) return;
+  const openAtLogin = configStore.get('startAtLogin') === true;
+  try {
+    app.setLoginItemSettings({ openAtLogin });
+  } catch (err) {
+    console.error('[Startup] Could not update login item', err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -732,7 +859,14 @@ function main() {
     powerMonitor.on('lock-screen', () => awayTracker.lock());
     powerMonitor.on('unlock-screen', onUnlock);
 
-    connectorManager = new ConnectorManager(deliverCue);
+    connectorManager = new ConnectorManager(deliverCue, (issues) => {
+      connectorHealth = issues;
+      updateTray();
+      // Keep an open settings window's banner live.
+      if (settingsWindow && !settingsWindow.isDestroyed()) {
+        send(settingsWindow, 'connector-health', issues);
+      }
+    });
     initConnectors();
 
     // Displays come and go (docking, projectors); keep one overlay on each.
@@ -773,6 +907,20 @@ function main() {
       },
     });
 
+    applyLoginItemSetting();
+    autoUpdate = createAutoUpdate({
+      isPackaged: app.isPackaged,
+      isEnabled: () => configStore.get('autoUpdateEnabled') !== false,
+      onCue: (payload) => deliverCue(payload),
+    });
+    autoUpdate.start();
+
+    // First run: open the wizard so the first cue is a minute away, not a
+    // documentation dive.
+    if (configStore.get('onboardingDone') !== true) {
+      createOnboardingWindow();
+    }
+
     app.on('activate', () => {
       if (overlayWindows.every((window) => window.isDestroyed())) {
         rebuildOverlays();
@@ -802,6 +950,7 @@ function main() {
     if (teamsPresence) teamsPresence.dispose();
     if (slackTide) slackTide.stop();
     if (agentAck) agentAck.stop();
+    if (autoUpdate) autoUpdate.stop();
   });
 }
 

@@ -4,7 +4,7 @@
  * Windows 11 integration helpers: accent-colour parsing, the attention-tier
  * rules used by focus deferral, and the SHQueryUserNotificationState mapping.
  * Pure functions only — nothing here imports Electron — so the logic stays
- * unit-testable and portable to the eventual Tauri backend (see docs/ADR.md).
+ * unit-testable and portable to the eventual Tauri backend (see ai-native/ADR.md).
  */
 
 /** Windows 11 default accent ("blue"), used when the OS accent is unavailable. */

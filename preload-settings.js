@@ -14,4 +14,11 @@ contextBridge.exposeInMainWorld('peripherySettings', {
   clearSecret: (field) => ipcRenderer.invoke('clear-secret', field),
   /** @param {string} cue */
   sendTestCue: (cue) => ipcRenderer.invoke('send-test-cue', cue),
+  /**
+   * Live connector-health pushes while the window is open.
+   * @param {(issues: object[]) => void} handler
+   */
+  onConnectorHealth(handler) {
+    ipcRenderer.on('connector-health', (event, issues) => handler(issues));
+  },
 });

@@ -23,14 +23,14 @@ module.exports = [
   },
   {
     // Sandboxed renderer scripts: browser globals plus the preload bridges.
-    files: ['renderer.js', 'settings.js'],
+    files: ['renderer.js', 'settings.js', 'onboarding.js'],
     languageOptions: {
       globals: { ...globals.browser },
     },
   },
   {
-    // The static landing page runs in a plain browser, not Node.
-    files: ['website/**/*.js'],
+    // The static landing page (docs/ = GitHub Pages) runs in a plain browser.
+    files: ['docs/**/*.js'],
     languageOptions: {
       sourceType: 'script',
       globals: { ...globals.browser },

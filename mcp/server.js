@@ -4,7 +4,7 @@
 /**
  * Periphery MCP server — lets coding agents (Claude Code, Devin, GitHub
  * Copilot, or anything MCP-capable) signal through ambient light instead of
- * a terminal bell the user cannot see. See docs/agents.md for client setup.
+ * a terminal bell the user cannot see. See ai-native/agents.md for client setup.
  *
  * Speaks MCP over stdio (newline-delimited JSON-RPC 2.0) and forwards tool
  * calls to the local webhook (server/webhookServer.js). Zero dependencies;

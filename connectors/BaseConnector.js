@@ -15,7 +15,7 @@ const SEEN_KEEP = 100;
  *
  * Connectors never import Electron: everything they need from the host
  * (currently just secret lookup) arrives through `config`. That keeps the
- * polling logic unit-testable and portable to Tauri (see docs/ADR.md).
+ * polling logic unit-testable and portable to Tauri (see ai-native/ADR.md).
  */
 class BaseConnector extends EventEmitter {
   constructor(config = {}) {
@@ -23,6 +23,24 @@ class BaseConnector extends EventEmitter {
     this.config = config;
     this.isRunning = false;
     this.authFailureReported = false;
+    /**
+     * Poller health, surfaced in the tray and settings instead of dying in
+     * the console. Statuses: 'ok' | 'auth-failed' | 'rate-limited' | 'error'.
+     * @type {{status: string, detail: string|null}}
+     */
+    this.health = { status: 'ok', detail: null };
+  }
+
+  /**
+   * Records a health transition and announces it. Deduplicated so a poller
+   * erroring every 30s emits one event, not a stream.
+   * @param {string} status
+   * @param {string|null} [detail]
+   */
+  setHealth(status, detail = null) {
+    if (this.health.status === status && this.health.detail === detail) return;
+    this.health = { status, detail };
+    this.emit('health', this.health);
   }
 
   /**
@@ -78,6 +96,7 @@ class BaseConnector extends EventEmitter {
     if (this.authFailureReported) return;
     this.authFailureReported = true;
     console.error(`[Connector] ${this.constructor.name}: ${message}`);
+    this.setHealth('auth-failed', message);
     this.triggerCue({
       cue: 'glow-bottom',
       color: WARN,
@@ -105,16 +124,35 @@ class BaseConnector extends EventEmitter {
    * @param {string} label - what is being fetched, for error logs
    * @returns {Promise<Response|null>} null when the request failed or auth was rejected
    */
+  /**
+   * @param {Response} response
+   * @returns {boolean} whether this is an API rate limit rather than a real
+   *   auth problem. GitHub signals limits as 403 with a drained quota header,
+   *   so this must be checked before treating a 403 as a revoked token.
+   */
+  isRateLimited(response) {
+    if (response.status === 429) return true;
+    return response.status === 403
+      && response.headers?.get?.('x-ratelimit-remaining') === '0';
+  }
+
   async _get(pathAndQuery, label) {
     const response = await fetch(`${this.apiBase}${pathAndQuery}`, {
       headers: this._authHeaders(),
     });
 
+    if (this.isRateLimited(response)) {
+      // Transient by definition: keep polling, recover on the next 2xx.
+      this.setHealth('rate-limited', `${this.logTag}: API rate limit hit`);
+      return null;
+    }
     if (this.handleAuthResponse(response, this.authFailureMessage)) return null;
     if (!response.ok) {
       console.error(`[${this.logTag}] Error fetching ${label}: ${response.status} ${response.statusText}`);
+      this.setHealth('error', `${this.logTag}: HTTP ${response.status} fetching ${label}`);
       return null;
     }
+    this.setHealth('ok');
     return response;
   }
 

@@ -16,6 +16,11 @@
 
   <h1>Settings</h1>
 
+  <div class="health-banner" id="healthBanner" hidden role="alert">
+    <span class="health-icon" aria-hidden="true">&#9888;</span>
+    <div id="healthList"></div>
+  </div>
+
   <div class="section">
     <div class="section-title">General Appearance</div>
 
@@ -227,6 +232,47 @@
       or Do Not Disturb (including Focusing) holds ambient cues like focus mode
       does. Uses the Graph token above, which then also needs the
       <code>Presence.Read</code> scope.
+    </p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Application</div>
+
+    <div class="form-group row">
+      <label for="startAtLogin">Start Periphery at login</label>
+      <label class="switch">
+        <input type="checkbox" id="startAtLogin">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="form-group row">
+      <label for="autoUpdateEnabled">Install updates automatically</label>
+      <label class="switch">
+        <input type="checkbox" id="autoUpdateEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      Updates download quietly in the background, announce themselves as a
+      single ambient glow, and install when you quit. Never a popup.
+    </p>
+
+    <div class="form-group row">
+      <label for="healthBadgeEnabled">Show connector issues in the tray</label>
+      <label class="switch">
+        <input type="checkbox" id="healthBadgeEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      A failing poller (expired token, rate limit) puts an amber dot on the
+      tray icon and its reason in the tooltip, instead of failing silently.
+    </p>
+
+    <p class="hint" id="packagedNote" hidden>
+      Start-at-login and auto-update apply to the installed build only; this
+      is a development run.
     </p>
   </div>
 

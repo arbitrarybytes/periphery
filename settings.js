@@ -54,6 +54,26 @@ function flashStatus(message) {
   }, STATUS_RESET_MS);
 }
 
+/**
+ * Renders the connector-health banner (amber, above the sections).
+ * @param {Array<{name: string, status: string, detail: string|null}>} issues
+ */
+function renderHealthBanner(issues) {
+  const banner = $('healthBanner');
+  const list = $('healthList');
+  if (!Array.isArray(issues) || issues.length === 0) {
+    banner.hidden = true;
+    list.replaceChildren();
+    return;
+  }
+  list.replaceChildren(...issues.map((issue) => {
+    const line = document.createElement('p');
+    line.textContent = issue.detail || `${issue.name}: ${issue.status}`;
+    return line;
+  }));
+  banner.hidden = false;
+}
+
 async function loadConfig() {
   const config = await window.peripherySettings.getConfig();
 
@@ -87,6 +107,14 @@ async function loadConfig() {
   $('outlookEmail').value = config.outlookEmail || '';
   // Opt-in (needs an extra Graph scope), unlike the default-on toggles above.
   $('teamsPresenceEnabled').checked = config.teamsPresenceEnabled === true;
+
+  // Opt-in: registering yourself at login is the user's call to make.
+  $('startAtLogin').checked = config.startAtLogin === true;
+  $('autoUpdateEnabled').checked = config.autoUpdateEnabled !== false;
+  $('healthBadgeEnabled').checked = config.healthBadgeEnabled !== false;
+  $('packagedNote').hidden = config.isPackaged !== false;
+
+  renderHealthBanner(config.connectorHealth);
 
   renderSecretState('gitlabPatStatus', 'clearGitlabPat', config.hasGitlabPat);
   renderSecretState('githubPatStatus', 'clearGithubPat', config.hasGithubPat);
@@ -133,6 +161,10 @@ async function save() {
     outlookEmail: $('outlookEmail').value,
     outlookToken: $('outlookToken').value, // Secret; blank keeps the existing one
     teamsPresenceEnabled: $('teamsPresenceEnabled').checked,
+
+    startAtLogin: $('startAtLogin').checked,
+    autoUpdateEnabled: $('autoUpdateEnabled').checked,
+    healthBadgeEnabled: $('healthBadgeEnabled').checked,
   });
 
   if (!result.success) {
@@ -168,6 +200,8 @@ $('clearGitlabPat').addEventListener('click', () => clearSecret('gitlabPat'));
 $('clearGithubPat').addEventListener('click', () => clearSecret('githubPat'));
 $('clearOutlookToken').addEventListener('click', () => clearSecret('outlookToken'));
 $('testCueBtn').addEventListener('click', () => window.peripherySettings.sendTestCue('glow-pulse'));
+
+window.peripherySettings.onConnectorHealth(renderHealthBanner);
 
 loadConfig().catch((err) => {
   console.error('Failed to load settings', err);
