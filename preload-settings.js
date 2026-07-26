@@ -6,7 +6,7 @@ const { contextBridge, ipcRenderer } = require('electron');
  * Settings bridge. Note that no method can read a stored secret back out —
  * `getConfig` only reports whether one is present.
  */
-contextBridge.exposeInMainWorld('flowstateSettings', {
+contextBridge.exposeInMainWorld('peripherySettings', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   /** @param {object} config */
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),

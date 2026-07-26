@@ -48,4 +48,4 @@ function drawBadgeDot(bitmap, width, height, color) {
   return out;
 }
 
-module.exports = { drawBadgeDot, DOT_SCALE };
+module.exports = { drawBadgeDot };

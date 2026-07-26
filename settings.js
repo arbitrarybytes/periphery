@@ -1,13 +1,18 @@
 'use strict';
 
 /**
- * Settings UI. Talks to the main process only through the `flowstateSettings`
+ * Settings UI. Talks to the main process only through the `peripherySettings`
  * bridge exposed by preload-settings.js — it has no Node access.
  */
 
 const REPEATS_MIN = 1;
 const REPEATS_MAX = 10;
 const REPEATS_DEFAULT = 3;
+/** Mirrors utils/cuePayload.js glow-speed levels (sandboxed: no require). */
+const SPEED_MIN = 1;
+const SPEED_MAX = 5;
+const SPEED_DEFAULT = 3;
+const SPEED_LABELS = ['Super slow', 'Slow', 'Medium', 'Fast', 'Super fast'];
 const POMODORO_MIN = 1;
 const POMODORO_MAX = 240;
 const POMODORO_DEFAULT = 25;
@@ -50,7 +55,7 @@ function flashStatus(message) {
 }
 
 async function loadConfig() {
-  const config = await window.flowstateSettings.getConfig();
+  const config = await window.peripherySettings.getConfig();
 
   // Match the OS accent (buttons, toggles, focus rings) and hide the
   // Windows-only section elsewhere.
@@ -63,6 +68,8 @@ async function loadConfig() {
   $('respectFocusAssist').checked = config.respectFocusAssist !== false;
   $('slackTideEnabled').checked = config.slackTideEnabled !== false;
   $('glowRepeats').value = config.glowRepeats ?? REPEATS_DEFAULT;
+  $('glowSpeed').value = config.glowSpeed ?? SPEED_DEFAULT;
+  renderSpeedLabel();
 
   $('pomodoroEnabled').checked = config.pomodoroEnabled !== false;
   $('pomodoroMinutes').value = config.pomodoroMinutes ?? POMODORO_DEFAULT;
@@ -77,17 +84,25 @@ async function loadConfig() {
   renderSecretState('outlookTokenStatus', 'clearOutlookToken', config.hasOutlookToken);
 }
 
+/** Shows the current trackbar position as a word ("Medium", "Super fast"). */
+function renderSpeedLabel() {
+  const level = readNumber($('glowSpeed'), SPEED_MIN, SPEED_MAX, SPEED_DEFAULT);
+  $('glowSpeedLabel').textContent = SPEED_LABELS[level - 1];
+}
+
 async function save() {
   const repeats = readNumber($('glowRepeats'), REPEATS_MIN, REPEATS_MAX, REPEATS_DEFAULT);
+  const glowSpeed = readNumber($('glowSpeed'), SPEED_MIN, SPEED_MAX, SPEED_DEFAULT);
   const pomodoroMinutes = readNumber($('pomodoroMinutes'), POMODORO_MIN, POMODORO_MAX, POMODORO_DEFAULT);
 
   // Write the clamped values back so the user sees what was actually stored.
   $('glowRepeats').value = repeats;
   $('pomodoroMinutes').value = pomodoroMinutes;
 
-  const result = await window.flowstateSettings.saveConfig({
+  const result = await window.peripherySettings.saveConfig({
     verboseMode: $('verboseMode').checked,
     glowRepeats: repeats,
+    glowSpeed,
     respectFocusAssist: $('respectFocusAssist').checked,
     slackTideEnabled: $('slackTideEnabled').checked,
 
@@ -120,7 +135,7 @@ async function save() {
  * @param {'gitlabPat'|'outlookToken'} field
  */
 async function clearSecret(field) {
-  const result = await window.flowstateSettings.clearSecret(field);
+  const result = await window.peripherySettings.clearSecret(field);
   if (!result.success) {
     flashStatus(result.error || 'Could not remove the token.');
     return;
@@ -130,9 +145,10 @@ async function clearSecret(field) {
 }
 
 $('saveBtn').addEventListener('click', save);
+$('glowSpeed').addEventListener('input', renderSpeedLabel);
 $('clearGitlabPat').addEventListener('click', () => clearSecret('gitlabPat'));
 $('clearOutlookToken').addEventListener('click', () => clearSecret('outlookToken'));
-$('testCueBtn').addEventListener('click', () => window.flowstateSettings.sendTestCue('glow-pulse'));
+$('testCueBtn').addEventListener('click', () => window.peripherySettings.sendTestCue('glow-pulse'));
 
 loadConfig().catch((err) => {
   console.error('Failed to load settings', err);

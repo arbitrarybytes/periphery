@@ -1,7 +1,7 @@
 {
-  "name": "flowstate-poc",
+  "name": "periphery-poc",
   "version": "1.0.0",
-  "description": "Proof of concept for FlowState desktop notifications",
+  "description": "Proof of concept for Periphery desktop notifications",
   "license": "UNLICENSED",
   "private": true,
   "main": "main.js",

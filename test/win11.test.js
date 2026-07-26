@@ -38,9 +38,11 @@ test('cue tiers follow the attention hierarchy', () => {
   assert.equal(cueTier({ cue: 'glow-bottom' }), 3);
 });
 
-test('meeting reminders always ride at tier 1 regardless of cue', () => {
-  assert.equal(cueTier({ cue: 'glow-pulse', icon: 'calendar' }), 1);
-  assert.equal(shouldDefer({ cue: 'glow-pulse', icon: 'calendar' }, true), false);
+test('the urgent flag forces tier 1 regardless of cue', () => {
+  assert.equal(cueTier({ cue: 'glow-pulse', urgent: true }), 1);
+  assert.equal(shouldDefer({ cue: 'glow-pulse', urgent: true }, true), false);
+  // The icon is purely decorative; it must never affect routing.
+  assert.equal(cueTier({ cue: 'glow-pulse', icon: 'calendar' }), 2);
 });
 
 test('shouldDefer holds ambient cues only while focused', () => {

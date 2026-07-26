@@ -5,6 +5,7 @@ const JsonFileStore = require('./JsonFileStore');
 /** Effective defaults for every non-secret setting. */
 const DEFAULTS = Object.freeze({
   glowRepeats: 3,
+  glowSpeed: 3, // 1 (tortoise) .. 5 (hare)
   verboseMode: true,
   respectFocusAssist: true,
   slackTideEnabled: true,
@@ -19,21 +20,17 @@ const DEFAULTS = Object.freeze({
 class ConfigStore extends JsonFileStore {
   /**
    * @param {string} storePath
-   * @param {object} [defaults]
    */
-  constructor(storePath, defaults = DEFAULTS) {
+  constructor(storePath) {
     super(storePath);
-    this.defaults = defaults;
     // Defaults are merged *under* the loaded file rather than used only when
     // no file exists, so a key added in a later release still has a value for
     // users who already have a config on disk.
-    this.store = { ...defaults, ...this.store };
+    this.store = { ...DEFAULTS, ...this.store };
   }
 
   get(key, defaultValue = null) {
-    if (this.store[key] !== undefined) return this.store[key];
-    if (this.defaults[key] !== undefined) return this.defaults[key];
-    return defaultValue;
+    return this.store[key] !== undefined ? this.store[key] : defaultValue;
   }
 
   set(key, value) {
@@ -56,4 +53,3 @@ class ConfigStore extends JsonFileStore {
 }
 
 module.exports = ConfigStore;
-module.exports.DEFAULTS = DEFAULTS;

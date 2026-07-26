@@ -10,6 +10,24 @@ const path = require('path');
  */
 class JsonFileStore {
   /**
+   * Adopts a store file left behind by an earlier app name (FlowState →
+   * Periphery), so a rebrand does not silently discard the user's settings
+   * and tokens. No-op unless the old file exists and the new one does not.
+   * @param {string} legacyPath
+   * @param {string} storePath
+   */
+  static adoptLegacyFile(legacyPath, storePath) {
+    try {
+      if (fs.existsSync(legacyPath) && !fs.existsSync(storePath)) {
+        fs.renameSync(legacyPath, storePath);
+        console.log(`[Store] Migrated ${path.basename(legacyPath)} -> ${path.basename(storePath)}`);
+      }
+    } catch (err) {
+      console.error(`[Store] Could not migrate ${legacyPath}`, err);
+    }
+  }
+
+  /**
    * @param {string} storePath - absolute path of the backing JSON file
    * @param {object} [options]
    * @param {number} [options.mode] - file mode applied on write

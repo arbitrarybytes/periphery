@@ -4,19 +4,16 @@ const { app, safeStorage } = require('electron');
 const path = require('path');
 
 const SecureStore = require('./stores/SecureStore');
+const JsonFileStore = require('./stores/JsonFileStore');
 
-/**
- * On Windows this is DPAPI, on macOS the Keychain, on Linux the available
- * secret service (kwallet/libsecret) — the ciphertext itself still lives in
- * the JSON file below.
- */
-const crypto = {
-  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
-  encryptString: (plain) => safeStorage.encryptString(plain),
-  decryptString: (buf) => safeStorage.decryptString(buf),
-};
+const userData = app.getPath('userData');
+const storePath = path.join(userData, 'periphery-secrets.json');
 
-module.exports = new SecureStore(
-  path.join(app.getPath('userData'), 'flowstate-secrets.json'),
-  crypto,
-);
+// Tokens stored before the FlowState -> Periphery rebrand.
+JsonFileStore.adoptLegacyFile(path.join(userData, 'flowstate-secrets.json'), storePath);
+
+// safeStorage already has the CryptoBackend shape SecureStore expects. On
+// Windows it is DPAPI, on macOS the Keychain, on Linux the available secret
+// service (kwallet/libsecret) — the ciphertext itself still lives in the JSON
+// file below.
+module.exports = new SecureStore(storePath, safeStorage);

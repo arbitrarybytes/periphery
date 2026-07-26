@@ -7,11 +7,12 @@ const os = require('node:os');
 const path = require('node:path');
 
 const ConfigStore = require('../utils/stores/ConfigStore');
+const JsonFileStore = require('../utils/stores/JsonFileStore');
 const SecureStore = require('../utils/stores/SecureStore');
 
 /** @returns {string} path to a fresh JSON store inside a temp dir */
 function tempStorePath(name) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flowstate-test-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'periphery-test-'));
   return path.join(dir, name);
 }
 
@@ -91,6 +92,30 @@ test('undecryptable secrets return null rather than garbage', () => {
     decryptString: () => { throw new Error('wrong key'); },
   };
   assert.equal(new SecureStore(storePath, brokenCrypto).getSecret('gitlab-pat'), null);
+});
+
+test('a legacy FlowState store file is adopted under the new name', () => {
+  const storePath = tempStorePath('periphery-config.json');
+  const legacyPath = path.join(path.dirname(storePath), 'flowstate-config.json');
+  fs.writeFileSync(legacyPath, JSON.stringify({ glowRepeats: 9 }));
+
+  JsonFileStore.adoptLegacyFile(legacyPath, storePath);
+  const store = new ConfigStore(storePath);
+
+  assert.equal(store.get('glowRepeats'), 9, 'settings survive the rebrand');
+  assert.equal(fs.existsSync(legacyPath), false, 'old file is renamed, not copied');
+});
+
+test('adoption never overwrites an existing new-name store', () => {
+  const storePath = tempStorePath('periphery-config.json');
+  const legacyPath = path.join(path.dirname(storePath), 'flowstate-config.json');
+  fs.writeFileSync(legacyPath, JSON.stringify({ glowRepeats: 9 }));
+  fs.writeFileSync(storePath, JSON.stringify({ glowRepeats: 5 }));
+
+  JsonFileStore.adoptLegacyFile(legacyPath, storePath);
+
+  assert.equal(new ConfigStore(storePath).get('glowRepeats'), 5);
+  assert.equal(fs.existsSync(legacyPath), true);
 });
 
 test('secrets can be reported on and removed without being read back', () => {

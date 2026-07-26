@@ -103,4 +103,3 @@ class SecureStore extends JsonFileStore {
 }
 
 module.exports = SecureStore;
-module.exports.SECRET_FILE_MODE = SECRET_FILE_MODE;

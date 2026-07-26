@@ -1,6 +1,6 @@
-# FlowState: Local Webhook Integrations
+# Periphery: Local Webhook Integrations
 
-FlowState runs a local HTTP server on `http://127.0.0.1:49123`. This is the easiest way to integrate your local developer tools with FlowState.
+Periphery runs a local HTTP server on `http://127.0.0.1:49123`. This is the easiest way to integrate your local developer tools with Periphery.
 
 You can trigger a visual cue by sending a simple HTTP POST request.
 
@@ -27,12 +27,13 @@ Any process running as your user can still post cues. Treat the endpoint as an "
 }
 ```
 
-| Field   | Required | Accepted values |
-| ------- | -------- | --------------- |
-| `cue`   | yes      | `glow`, `glow-bottom`, `glow-pulse`, `comet` |
-| `color` | no       | `#rgb` / `#rrggbb` / `#rrggbbaa`, `rgb(...)`, `rgba(...)`, or a colour keyword |
-| `msg`   | no       | Text for the kinetic-typography pill, up to 160 characters |
-| `icon`  | no       | `gitlab`, `outlook`, `calendar`, `pomodoro`, `alert` — bundled icons only, **not** a URL |
+| Field    | Required | Accepted values |
+| -------- | -------- | --------------- |
+| `cue`    | yes      | `glow`, `glow-bottom`, `glow-pulse`, `comet` |
+| `color`  | no       | `#rgb` / `#rrggbb` / `#rrggbbaa`, `rgb(...)`, `rgba(...)`, or a colour keyword |
+| `msg`    | no       | Text for the kinetic-typography pill, up to 160 characters |
+| `icon`   | no       | `gitlab`, `outlook`, `calendar`, `pomodoro`, `alert` — bundled icons only, **not** a URL |
+| `urgent` | no       | `true` to deliver at the highest attention tier: pierces focus mode and skips the typing-pause hold. Use sparingly. |
 
 `GET /health` returns the exact lists the running build accepts.
 
@@ -45,21 +46,21 @@ A `200` means the cue was **accepted**, not that it is on screen yet. Webhook cu
 *   While focus mode is on (Focus Assist, presentation mode, or the tray toggle), non-urgent cues (`glow`, `glow-pulse`, `glow-bottom`) are held and appear only in the summary when focus ends. A `comet` always shows immediately.
 *   While the user is actively typing, non-urgent cues wait for the next typing pause (up to 90 seconds) before appearing.
 
-If your integration needs a cue to punch through no matter what — a Sev-1 page, a failed deploy gate — send `"cue": "comet"`.
+If your integration needs a cue to punch through no matter what — a Sev-1 page, a failed deploy gate — send `"cue": "comet"` or add `"urgent": true` to any cue.
 
 ---
 
 ## Common Integrations
 
 ### 1. Git Hooks (e.g. `pre-push` or `post-commit`)
-You can use FlowState to notify you when a long `git push` finishes, or if a pre-commit linting hook fails.
+You can use Periphery to notify you when a long `git push` finishes, or if a pre-commit linting hook fails.
 
 Create or edit the file `.git/hooks/post-commit`:
 ```bash
 #!/bin/bash
 # Your normal commit logic here...
 
-# Notify FlowState
+# Notify Periphery
 curl -X POST http://127.0.0.1:49123/notify \
      -H "Content-Type: application/json" \
      -d '{"cue":"glow-bottom", "color":"rgba(0, 255, 100, 0.6)", "msg":"Git Commit Successful"}'
@@ -67,7 +68,7 @@ curl -X POST http://127.0.0.1:49123/notify \
 *Don't forget to make the hook executable: `chmod +x .git/hooks/post-commit`*
 
 ### 2. NPM / Node.js Scripts
-You can integrate FlowState directly into your `package.json` to let you know when a massive Webpack build finishes or when your test suite fails.
+You can integrate Periphery directly into your `package.json` to let you know when a massive Webpack build finishes or when your test suite fails.
 
 In `package.json`:
 ```json
@@ -99,7 +100,7 @@ For data scientists running 3-hour long ML training models locally, you can add 
 ```python
 import requests
 
-def notify_flowstate(message, color="rgba(0, 255, 0, 0.8)"):
+def notify_periphery(message, color="rgba(0, 255, 0, 0.8)"):
     try:
         requests.post("http://127.0.0.1:49123/notify", json={
             "cue": "glow-pulse",
@@ -107,8 +108,8 @@ def notify_flowstate(message, color="rgba(0, 255, 0, 0.8)"):
             "msg": message
         }, timeout=2)
     except Exception:
-        pass  # Ignore if FlowState is not running
+        pass  # Ignore if Periphery is not running
 
 # ... your long training loop ...
-notify_flowstate("Model Training Complete!")
+notify_periphery("Model Training Complete!")
 ```

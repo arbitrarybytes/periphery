@@ -104,7 +104,7 @@ function createWebhookApp({ onCue }) {
 function startWebhookServer({ onCue, port = DEFAULT_PORT, onError }) {
   const app = createWebhookApp({ onCue });
   const server = app.listen(port, HOST, () => {
-    console.log(`FlowState local hook listening on http://${HOST}:${port}`);
+    console.log(`Periphery local hook listening on http://${HOST}:${port}`);
   });
 
   server.on('error', (err) => {
@@ -118,4 +118,4 @@ function startWebhookServer({ onCue, port = DEFAULT_PORT, onError }) {
   return server;
 }
 
-module.exports = { createWebhookApp, startWebhookServer, DEFAULT_PORT, HOST };
+module.exports = { startWebhookServer, DEFAULT_PORT, HOST };

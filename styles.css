@@ -258,15 +258,8 @@ body {
    are sized for the full-length animations, so ending early just means the
    element sits invisible (opacity 0, fill forwards) until removed.
    ========================================= */
-body.eco .cue-glow,
-body.eco .cue-glow-bottom {
-  animation-duration: 2.5s;
-}
-
-body.eco .cue-glow-pulse {
-  animation-duration: 1s;
-}
-
+/* Glow durations are set inline by renderer.js (eco base x user speed);
+   only the cues below still take their eco duration from CSS. */
 body.eco .cue-comet {
   animation-duration: 4s;
 }

@@ -2,12 +2,14 @@
 
 const EventEmitter = require('events');
 
+const { WARN } = require('../utils/palette');
+
 /** Bound on the "already notified" sets connectors keep, so they cannot grow forever. */
 const SEEN_LIMIT = 200;
 const SEEN_KEEP = 100;
 
 /**
- * Base class for all FlowState Connectors.
+ * Base class for all Periphery Connectors.
  * Connectors are plugins that monitor external states and emit events
  * when a visual cue should be triggered.
  *
@@ -78,7 +80,7 @@ class BaseConnector extends EventEmitter {
     console.error(`[Connector] ${this.constructor.name}: ${message}`);
     this.triggerCue({
       cue: 'glow-bottom',
-      color: 'rgba(255, 176, 32, 0.8)',
+      color: WARN,
       msg: message,
       icon: 'alert',
     });
@@ -96,6 +98,27 @@ class BaseConnector extends EventEmitter {
   }
 
   /**
+   * Authenticated GET against the connector's API. Subclasses set
+   * `this.apiBase`, `this.logTag`, `this.authFailureMessage` and implement
+   * `_authHeaders()`.
+   * @param {string} pathAndQuery
+   * @param {string} label - what is being fetched, for error logs
+   * @returns {Promise<Response|null>} null when the request failed or auth was rejected
+   */
+  async _get(pathAndQuery, label) {
+    const response = await fetch(`${this.apiBase}${pathAndQuery}`, {
+      headers: this._authHeaders(),
+    });
+
+    if (this.handleAuthResponse(response, this.authFailureMessage)) return null;
+    if (!response.ok) {
+      console.error(`[${this.logTag}] Error fetching ${label}: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    return response;
+  }
+
+  /**
    * Caps an "already notified" set at its most recent entries. Relies on Sets
    * iterating in insertion order.
    * @param {Set<*>} seen
@@ -108,5 +131,3 @@ class BaseConnector extends EventEmitter {
 }
 
 module.exports = BaseConnector;
-module.exports.SEEN_LIMIT = SEEN_LIMIT;
-module.exports.SEEN_KEEP = SEEN_KEEP;

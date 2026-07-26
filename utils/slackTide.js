@@ -144,10 +144,4 @@ class SlackTideQueue {
   }
 }
 
-module.exports = {
-  SlackTideQueue,
-  PAUSE_SECONDS,
-  MAX_HOLD_MS,
-  STAGGER_MS,
-  MAX_QUEUE,
-};
+module.exports = { SlackTideQueue };

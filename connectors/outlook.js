@@ -1,6 +1,7 @@
 'use strict';
 
 const BaseConnector = require('./BaseConnector');
+const { INFO, SUBTLE, MEETING } = require('../utils/palette');
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 /** Unread messages fetched per poll. Sized so a normal burst is not dropped. */
@@ -24,10 +25,17 @@ const OUTLOOK_ICON = 'outlook';
 class OutlookConnector extends BaseConnector {
   constructor(config) {
     super(config);
+    this.apiBase = GRAPH_BASE;
+    this.logTag = 'Outlook';
+    this.authFailureMessage = 'Outlook: sign-in expired, re-enter your token';
     this.pollIntervalMs = config.pollIntervalMs || 60000;
     this.timerId = null;
     this.processedMessageIds = new Set();
     this.notifiedMeetingIds = new Set();
+  }
+
+  _authHeaders() {
+    return { Authorization: `Bearer ${this.token}` };
   }
 
   start() {
@@ -67,24 +75,6 @@ class OutlookConnector extends BaseConnector {
   }
 
   /**
-   * @returns {Promise<Response|null>} null when the request failed or auth was rejected
-   */
-  async _get(pathAndQuery, label) {
-    const response = await fetch(`${GRAPH_BASE}${pathAndQuery}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
-    });
-
-    if (this.handleAuthResponse(response, 'Outlook: sign-in expired, re-enter your token')) {
-      return null;
-    }
-    if (!response.ok) {
-      console.error(`[Outlook] Error fetching ${label}: ${response.status} ${response.statusText}`);
-      return null;
-    }
-    return response;
-  }
-
-  /**
    * @param {Array<{emailAddress?: {address?: string}}>|undefined} recipients
    * @returns {boolean}
    */
@@ -120,7 +110,7 @@ class OutlookConnector extends BaseConnector {
           // Addressed directly -> higher priority.
           this.triggerCue({
             cue: 'comet',
-            color: 'rgba(0, 150, 255, 0.9)',
+            color: INFO,
             msg: `Email from ${senderName}`,
             icon: OUTLOOK_ICON,
           });
@@ -128,7 +118,7 @@ class OutlookConnector extends BaseConnector {
           // Merely CC'd -> very subtle, low priority.
           this.triggerCue({
             cue: 'glow-bottom',
-            color: 'rgba(100, 100, 100, 0.5)',
+            color: SUBTLE,
             msg: `CC'd by ${senderName}`,
             icon: OUTLOOK_ICON,
           });
@@ -172,9 +162,11 @@ class OutlookConnector extends BaseConnector {
 
           this.triggerCue({
             cue: 'glow-pulse',
-            color: 'rgba(255, 165, 0, 0.8)',
+            color: MEETING,
             msg: `Meeting: ${event.subject} starts in ${Math.max(0, Math.round(minutesUntilStart))} min`,
             icon: 'calendar',
+            // Time-critical: must pierce focus mode (tier 1).
+            urgent: true,
           });
         }
       }

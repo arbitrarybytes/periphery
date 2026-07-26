@@ -126,6 +126,7 @@ test('an imminent meeting fires once', async () => {
   assert.equal(cues.length, 1);
   assert.match(cues[0].msg, /Standup starts in \d+ min/);
   assert.equal(cues[0].icon, 'calendar');
+  assert.equal(cues[0].urgent, true, 'meeting reminders must pierce focus mode');
   assert.ok(CUE_NAMES.includes(cues[0].cue));
   assert.ok(ICON_NAMES.includes(cues[0].icon));
 });

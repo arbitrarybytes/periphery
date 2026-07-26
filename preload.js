@@ -6,7 +6,7 @@ const { contextBridge, ipcRenderer } = require('electron');
  * Overlay bridge. The renderer gets exactly one capability — being told about
  * a cue — instead of the full Node API it had under nodeIntegration.
  */
-contextBridge.exposeInMainWorld('flowstate', {
+contextBridge.exposeInMainWorld('periphery', {
   /**
    * @param {(payload: object) => void} handler
    */

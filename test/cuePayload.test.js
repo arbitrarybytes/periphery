@@ -8,6 +8,7 @@ const {
   isValidColor,
   sanitizeMessage,
   clampRepeats,
+  glowSpeedFactor,
   MSG_MAX_LENGTH,
   REPEATS_DEFAULT,
 } = require('../utils/cuePayload');
@@ -61,6 +62,29 @@ test('messages are stripped of control characters and length-capped', () => {
   assert.equal(sanitizeMessage('   '), undefined);
   assert.equal(sanitizeMessage(42), undefined);
   assert.equal(sanitizeMessage('x'.repeat(500)).length, MSG_MAX_LENGTH);
+});
+
+test('urgent survives only as the literal true', () => {
+  assert.equal(sanitizeCuePayload({ cue: 'glow-pulse', urgent: true }).urgent, true);
+  assert.equal(sanitizeCuePayload({ cue: 'glow-pulse', urgent: 'yes' }).urgent, undefined);
+  assert.equal(sanitizeCuePayload({ cue: 'glow-pulse', urgent: 1 }).urgent, undefined);
+  assert.equal(sanitizeCuePayload({ cue: 'glow-pulse' }).urgent, undefined);
+});
+
+test('glowSpeedFactor maps tortoise to slower and hare to faster', () => {
+  assert.equal(glowSpeedFactor(1), 2, 'super slow doubles the duration');
+  assert.equal(glowSpeedFactor(3), 1, 'medium is the unchanged baseline');
+  assert.ok(glowSpeedFactor(5) < glowSpeedFactor(4), 'monotonic toward the hare');
+  assert.ok(glowSpeedFactor(5) <= 0.5, 'super fast at least halves the duration');
+});
+
+test('glowSpeedFactor clamps garbage to the medium baseline or range edges', () => {
+  assert.equal(glowSpeedFactor(undefined), 1);
+  assert.equal(glowSpeedFactor(null), 1);
+  assert.equal(glowSpeedFactor('nope'), 1);
+  assert.equal(glowSpeedFactor(0), glowSpeedFactor(1), 'below range pins to tortoise');
+  assert.equal(glowSpeedFactor(99), glowSpeedFactor(5), 'above range pins to hare');
+  assert.equal(glowSpeedFactor('4'), glowSpeedFactor(4), 'numeric strings accepted');
 });
 
 test('clampRepeats never yields NaN', () => {

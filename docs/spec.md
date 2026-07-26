@@ -1,12 +1,12 @@
-# FlowState: Unobtrusive Desktop Notification System
+# Periphery: Unobtrusive Desktop Notification System
 ## Product Specification
 
 > **Status (2026-07-26):** This is the product vision. Items marked ✅ are implemented in the current PoC; items marked 🔭 are planned but not yet built. Where the vision and the code differ (notably the tech stack), the divergence is recorded in [ADR.md](ADR.md).
 
 ### 1. Vision & Core Philosophy
-FlowState (working title) is a desktop notification layer designed to keep professionals informed without breaking their deep work state (flow). Moving beyond standard OS toast notifications—which are often jarring, anxiety-inducing, and demand immediate attention—FlowState utilizes subtle, delightful, and ambient visual/audio cues. 
+Periphery (formerly FlowState) is a desktop notification layer designed to keep professionals informed without breaking their deep work state (flow). Moving beyond standard OS toast notifications—which are often jarring, anxiety-inducing, and demand immediate attention—Periphery utilizes subtle, delightful, and ambient visual/audio cues. 
 
-**Crucially, FlowState is an enterprise-ready, local-first application.** No user data, calendar events, or proprietary code ever leaves the local machine. It acts as a local broker between your tasks and your screen.
+**Crucially, Periphery is an enterprise-ready, local-first application.** No user data, calendar events, or proprietary code ever leaves the local machine. It acts as a local broker between your tasks and your screen.
 
 ### 2. Core Architecture (Local-First Guarantee)
 To satisfy strict enterprise security requirements:
@@ -30,7 +30,7 @@ Moving beyond the original "flying bird" experiment, the system offers a diverse
 ### 4. Connectors & Individual Productivity (The Triggers)
 Focusing on developer and individual productivity, the app will ship with the following core connectors:
 
-*   ✅ **Local Hook (webhook form):** Any local tool can POST to `127.0.0.1:49123/notify` (see [webhooks.md](webhooks.md)). 🔭 A globally installed `flowstate` CLI wrapper (`npm run build && flowstate notify --cue=glow ...`) is planned sugar over this endpoint.
+*   ✅ **Local Hook (webhook form):** Any local tool can POST to `127.0.0.1:49123/notify` (see [webhooks.md](webhooks.md)). 🔭 A globally installed `periphery` CLI wrapper (`npm run build && periphery notify --cue=glow ...`) is planned sugar over this endpoint.
 *   ✅ **GitLab:** Polls pipelines on a configured project (success/failure, naming the failing job) and the user's pending todos (review requests, assignments, mentions, approvals). 🔭 GitHub equivalent.
 *   ✅ **Outlook (Microsoft Graph):** Polls unread inbox mail — distinguishing direct 'To' from low-priority 'CC' — and fires a reminder shortly before calendar events start. *(Not in the original spec; added during Phase 2.)*
 *   ✅ **Time & Pomodoro:** Built-in local break reminder timer, configurable 1–240 minutes.

@@ -1,5 +1,5 @@
 /*
- * FlowState settings — Windows 11 Fluent styling.
+ * Periphery settings — Windows 11 Fluent styling.
  *
  * The window is created with backgroundMaterial: 'mica' and a hidden title
  * bar, so the page paints translucent surfaces over the system backdrop and
@@ -229,6 +229,34 @@ button.link[disabled] {
   color: var(--text-secondary);
   cursor: default;
   text-decoration: none;
+}
+
+/* ---- Glow-speed trackbar (tortoise -> hare) ---- */
+
+.row-between {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.speed-track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.speed-emoji {
+  font-size: 18px;
+  line-height: 1;
+  user-select: none;
+}
+
+input[type="range"] {
+  flex: 1;
+  height: 20px;
+  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
 }
 
 .secret-row {

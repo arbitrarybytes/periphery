@@ -24,6 +24,16 @@ const REPEATS_MIN = 1;
 const REPEATS_MAX = 10;
 const REPEATS_DEFAULT = 3;
 
+/** Glow-speed setting: 1 (tortoise) .. 5 (hare), stored in config as an int. */
+const GLOW_SPEED_MIN = 1;
+const GLOW_SPEED_MAX = 5;
+const GLOW_SPEED_DEFAULT = 3;
+/**
+ * Animation-duration multiplier per speed level. Index = level - 1.
+ * 2x slower at the tortoise end, roughly 2x faster at the hare end.
+ */
+const GLOW_SPEED_FACTORS = Object.freeze([2, 1.4, 1, 0.7, 0.45]);
+
 const CUES = new Set(CUE_NAMES);
 const ICONS = new Set(ICON_NAMES);
 
@@ -35,8 +45,8 @@ const NAMED_COLORS = new Set([
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const RGB_COLOR = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*(\d+(?:\.\d+)?|\.\d+)\s*)?\)$/i;
 
-const SPACE_CODE = 0x20;
-const DELETE_CODE = 0x7f;
+// eslint-disable-next-line no-control-regex -- matching control chars is the point
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
 
 /**
  * A colour is only accepted if it parses as an exact hex / rgb() / rgba()
@@ -59,44 +69,57 @@ function isValidColor(value) {
 }
 
 /**
- * Replaces control characters with spaces so a message cannot break the
- * single-line layout of the kinetic-typography pill.
- * @param {string} value
- * @returns {string}
- */
-function stripControlChars(value) {
-  let out = '';
-  for (const char of value) {
-    const code = char.codePointAt(0);
-    out += code < SPACE_CODE || code === DELETE_CODE ? ' ' : char;
-  }
-  return out;
-}
-
-/**
+ * Control characters become spaces so a message cannot break the single-line
+ * layout of the kinetic-typography pill.
  * @param {unknown} value
  * @returns {string|undefined} the trimmed, length-capped message
  */
 function sanitizeMessage(value) {
   if (typeof value !== 'string') return undefined;
-  const msg = stripControlChars(value).trim().slice(0, MSG_MAX_LENGTH);
+  const msg = value.replace(CONTROL_CHARS, ' ').trim().slice(0, MSG_MAX_LENGTH);
   return msg.length > 0 ? msg : undefined;
 }
 
 /**
- * Coerces a pulse-repeat count into a usable integer. Guards the renderer
- * against `NaN` (which would make setTimeout fire immediately) and against
- * absurd values that would pin an animation on screen.
+ * Coerces untrusted input into a usable integer inside [min, max].
+ * @param {unknown} value
+ * @param {number} min
+ * @param {number} max
+ * @param {number} fallback
+ * @returns {number}
+ */
+function clampNumber(value, min, max, fallback) {
+  // An absent or blank value means "use the default" — never let JS coerce
+  // null or '' to zero.
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string' && value.trim() === '') return fallback;
+  const num = typeof value === 'string' ? Number(value) : value;
+  if (typeof num !== 'number' || !Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(num)));
+}
+
+/**
+ * Pulse-repeat clamp. Guards the renderer against `NaN` (which would make
+ * setTimeout fire immediately) and against values that would pin an
+ * animation on screen.
  * @param {unknown} value
  * @param {number} [fallback]
  * @returns {number}
  */
 function clampRepeats(value, fallback = REPEATS_DEFAULT) {
-  // A blank field means "use the default", not zero.
-  if (typeof value === 'string' && value.trim() === '') return fallback;
-  const num = typeof value === 'string' ? Number(value) : value;
-  if (typeof num !== 'number' || !Number.isFinite(num)) return fallback;
-  return Math.min(REPEATS_MAX, Math.max(REPEATS_MIN, Math.round(num)));
+  return clampNumber(value, REPEATS_MIN, REPEATS_MAX, fallback);
+}
+
+/**
+ * Maps a stored glow-speed level to its duration multiplier, clamping
+ * garbage to Medium (1x).
+ * @param {unknown} level
+ * @returns {number}
+ */
+function glowSpeedFactor(level) {
+  return GLOW_SPEED_FACTORS[
+    clampNumber(level, GLOW_SPEED_MIN, GLOW_SPEED_MAX, GLOW_SPEED_DEFAULT) - 1
+  ];
 }
 
 /**
@@ -117,6 +140,10 @@ function sanitizeCuePayload(raw) {
 
   if (typeof raw.icon === 'string' && ICONS.has(raw.icon)) payload.icon = raw.icon;
 
+  // Urgency is an explicit, validated flag: urgent cues ride at tier 1 and
+  // pierce focus mode. Only the literal `true` counts.
+  if (raw.urgent === true) payload.urgent = true;
+
   return payload;
 }
 
@@ -127,8 +154,13 @@ module.exports = {
   REPEATS_MIN,
   REPEATS_MAX,
   REPEATS_DEFAULT,
+  GLOW_SPEED_MIN,
+  GLOW_SPEED_MAX,
+  GLOW_SPEED_DEFAULT,
   isValidColor,
   sanitizeMessage,
   sanitizeCuePayload,
+  clampNumber,
   clampRepeats,
+  glowSpeedFactor,
 };

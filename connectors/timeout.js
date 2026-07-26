@@ -56,5 +56,3 @@ class TimeoutConnector extends BaseConnector {
 }
 
 module.exports = TimeoutConnector;
-module.exports.DEFAULT_DURATION_MS = DEFAULT_DURATION_MS;
-module.exports.MIN_DURATION_MS = MIN_DURATION_MS;

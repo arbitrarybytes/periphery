@@ -6,23 +6,37 @@
  * which remains the source of truth and the authoritative validator.
  */
 
-const CUE_CLASSES = {
-  glow: 'cue-glow',
-  'glow-bottom': 'cue-glow-bottom',
-  'glow-pulse': 'cue-glow-pulse',
-};
+/** Cues rendered as a `cue-<name>` glow element; comet is handled apart. */
+const GLOW_CUES = ['glow', 'glow-bottom', 'glow-pulse'];
 const ICON_NAMES = ['gitlab', 'outlook', 'calendar', 'pomodoro', 'alert'];
 
 const PULSE_DURATION_MS = 1500;
 const BREATHE_DURATION_MS = 4000;
+/** Shorter bases while on battery (previously body.eco CSS overrides). */
+const ECO_PULSE_DURATION_MS = 1000;
+const ECO_BREATHE_DURATION_MS = 2500;
 const COMET_DURATION_MS = 8000;
 const TEXT_DURATION_MS = 6000;
 const ANIMATION_PADDING_MS = 100;
 const REPEATS_MIN = 1;
 const REPEATS_MAX = 10;
 const REPEATS_DEFAULT = 3;
+const SPEED_FACTOR_MIN = 0.25;
+const SPEED_FACTOR_MAX = 4;
 
 const container = document.getElementById('cue-container');
+
+/** Mirrors body.eco; kept as a flag so glow durations can be computed in JS. */
+let ecoMode = false;
+
+/**
+ * @param {unknown} value - speedFactor from the enriched payload
+ * @returns {number} a safe duration multiplier
+ */
+function clampSpeedFactor(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 1;
+  return Math.min(SPEED_FACTOR_MAX, Math.max(SPEED_FACTOR_MIN, value));
+}
 
 /**
  * @param {unknown} value
@@ -57,22 +71,28 @@ function mount(element, lifetimeMs) {
   setTimeout(() => element.remove(), lifetimeMs);
 }
 
-function triggerGlow(color, className, repeats) {
+function triggerGlow(color, cue, repeats, speedFactor) {
   const glowEl = document.createElement('div');
-  glowEl.classList.add(className);
+  glowEl.classList.add(`cue-${cue}`);
 
   if (color) {
     glowEl.style.setProperty('--glow-color', color);
   }
 
-  const isPulse = className === CUE_CLASSES['glow-pulse'];
+  const isPulse = cue === 'glow-pulse';
   if (isPulse) {
     glowEl.style.animationIterationCount = String(repeats);
   }
 
-  mount(glowEl, isPulse
-    ? PULSE_DURATION_MS * repeats + ANIMATION_PADDING_MS
-    : BREATHE_DURATION_MS + ANIMATION_PADDING_MS);
+  // Duration is set inline (user speed setting x eco base) so the removal
+  // timer below can never drift from what the animation actually does.
+  const base = isPulse
+    ? (ecoMode ? ECO_PULSE_DURATION_MS : PULSE_DURATION_MS)
+    : (ecoMode ? ECO_BREATHE_DURATION_MS : BREATHE_DURATION_MS);
+  const duration = Math.round(base * speedFactor);
+  glowEl.style.animationDuration = `${duration}ms`;
+
+  mount(glowEl, (isPulse ? duration * repeats : duration) + ANIMATION_PADDING_MS);
 }
 
 function triggerComet(color) {
@@ -112,22 +132,20 @@ function triggerText(msg, color, icon) {
   mount(textEl, TEXT_DURATION_MS + ANIMATION_PADDING_MS);
 }
 
-window.flowstate.onCue((payload) => {
+window.periphery.onCue((payload) => {
   if (payload === null || typeof payload !== 'object') return;
 
-  const { cue, color, msg, icon, repeats, verbose } = payload;
+  const { cue, color, msg, icon, repeats, verbose, speedFactor } = payload;
 
   if (cue === 'comet') {
     triggerComet(color);
+  } else if (GLOW_CUES.includes(cue)) {
+    triggerGlow(color, cue, clampRepeats(repeats), clampSpeedFactor(speedFactor));
   } else {
-    const className = CUE_CLASSES[cue];
     // An unknown cue means the main-process allowlist and this one drifted;
     // say so rather than silently rendering nothing.
-    if (!className) {
-      console.warn(`[FlowState] Unknown cue: ${cue}`);
-      return;
-    }
-    triggerGlow(color, className, clampRepeats(repeats));
+    console.warn(`[Periphery] Unknown cue: ${cue}`);
+    return;
   }
 
   if (msg && verbose !== false) {
@@ -198,12 +216,12 @@ function renderConstellation(stars) {
   });
 }
 
-window.flowstate.onConstellation((data) => {
+window.periphery.onConstellation((data) => {
   if (data === null || typeof data !== 'object' || !Array.isArray(data.stars)) return;
   renderConstellation(data.stars);
 });
 
-window.flowstate.onTheme((theme) => {
+window.periphery.onTheme((theme) => {
   if (theme === null || typeof theme !== 'object') return;
 
   const root = document.documentElement;
@@ -213,6 +231,8 @@ window.flowstate.onTheme((theme) => {
   if (typeof theme.accentSoft === 'string') {
     root.style.setProperty('--accent-soft', theme.accentSoft);
   }
-  // On battery the stylesheet swaps to shorter, cheaper animations.
-  document.body.classList.toggle('eco', theme.onBattery === true);
+  // On battery the stylesheet swaps to shorter, cheaper animations; the
+  // glow durations are computed here in JS (see triggerGlow).
+  ecoMode = theme.onBattery === true;
+  document.body.classList.toggle('eco', ecoMode);
 });

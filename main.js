@@ -8,7 +8,10 @@ const path = require('path');
 
 const secureStore = require('./utils/secureStore');
 const configStore = require('./utils/configStore');
-const { clampRepeats } = require('./utils/cuePayload');
+const {
+  clampRepeats, clampNumber, sanitizeCuePayload, glowSpeedFactor,
+  GLOW_SPEED_MIN, GLOW_SPEED_MAX, GLOW_SPEED_DEFAULT,
+} = require('./utils/cuePayload');
 const {
   FALLBACK_ACCENT, parseAccentColor, accentCss, cueTier, shouldDefer,
   countHeldIcons, deferredSummaryCue,
@@ -22,9 +25,14 @@ const GitLabConnector = require('./connectors/gitlab');
 const OutlookConnector = require('./connectors/outlook');
 const { startWebhookServer, DEFAULT_PORT } = require('./server/webhookServer');
 
-const GITLAB_PAT_KEY = 'gitlab-pat';
-const OUTLOOK_TOKEN_KEY = 'outlook-token';
-const SECRET_KEYS = { gitlabPat: GITLAB_PAT_KEY, outlookToken: OUTLOOK_TOKEN_KEY };
+/** Settings-form field -> secure-store key for each stored credential. */
+const SECRET_KEYS = { gitlabPat: 'gitlab-pat', outlookToken: 'outlook-token' };
+/** Config keys the connectors are built from; changes here require a restart. */
+const CONNECTOR_CONFIG_KEYS = [
+  'pomodoroEnabled', 'pomodoroMinutes',
+  'gitlabEnabled', 'gitlabProjectId',
+  'outlookEnabled', 'outlookEmail',
+];
 /** How long to wait for a burst of display changes to settle before rebuilding. */
 const DISPLAY_SETTLE_MS = 500;
 
@@ -84,14 +92,15 @@ function themePayload() {
 }
 
 /** @param {BrowserWindow} window */
-function sendTheme(window) {
+function send(window, channel, payload) {
   if (!window.isDestroyed()) {
-    window.webContents.send('set-theme', themePayload());
+    window.webContents.send(channel, payload);
   }
 }
 
-function broadcastTheme() {
-  for (const window of overlayWindows) sendTheme(window);
+/** Sends to every live overlay. */
+function broadcast(channel, payload) {
+  for (const window of overlayWindows) send(window, channel, payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +146,8 @@ function createOverlayWindow(display) {
   // Standing state (theme, constellation) must arrive after the page has
   // listeners, and again on every rebuild, so it rides on did-finish-load.
   window.webContents.on('did-finish-load', () => {
-    sendTheme(window);
-    sendConstellation(window);
+    send(window, 'set-theme', themePayload());
+    send(window, 'constellation', constellationPayload());
   });
 
   window.loadFile('index.html');
@@ -153,44 +162,46 @@ function rebuildOverlays() {
   overlayWindows = screen.getAllDisplays().map(createOverlayWindow);
 }
 
-let rebuildTimer = null;
+/**
+ * Brings the overlays in line with the current display set. A pure metrics
+ * change (scale factor, work area) only moves existing windows — a full
+ * teardown would respawn every renderer process for what is just a resize.
+ */
+function syncOverlays() {
+  const displays = screen.getAllDisplays();
+  const alive = overlayWindows.filter((window) => !window.isDestroyed());
+  if (alive.length !== displays.length || alive.length !== overlayWindows.length) {
+    rebuildOverlays();
+    return;
+  }
+  displays.forEach((display, i) => alive[i].setBounds(display.bounds));
+}
+
+let displaySettleTimer = null;
 
 /**
  * Display events arrive in bursts while a resolution or DPI change settles,
- * so coalesce them instead of tearing down every window each time.
+ * so coalesce them instead of reacting to every event.
  */
-function scheduleOverlayRebuild() {
-  if (rebuildTimer) clearTimeout(rebuildTimer);
-  rebuildTimer = setTimeout(() => {
-    rebuildTimer = null;
-    rebuildOverlays();
+function scheduleOverlaySync() {
+  if (displaySettleTimer) clearTimeout(displaySettleTimer);
+  displaySettleTimer = setTimeout(() => {
+    displaySettleTimer = null;
+    syncOverlays();
   }, DISPLAY_SETTLE_MS);
 }
 
 /**
- * Applies the user's display preferences to an outgoing cue.
- * @param {object} payload
- * @returns {object}
- */
-function enrichCuePayload(payload) {
-  return {
-    ...payload,
-    repeats: clampRepeats(configStore.get('glowRepeats')),
-    verbose: configStore.get('verboseMode') !== false,
-  };
-}
-
-/**
- * Sends a cue to every live overlay.
- * @param {object} payload - already validated by the caller
+ * Sends a cue, enriched with the user's display preferences, to every overlay.
+ * @param {object} payload - already validated
  */
 function broadcastCue(payload) {
-  const enriched = enrichCuePayload(payload);
-  for (const window of overlayWindows) {
-    if (!window.isDestroyed()) {
-      window.webContents.send('trigger-cue', enriched);
-    }
-  }
+  broadcast('trigger-cue', {
+    ...payload,
+    repeats: clampRepeats(configStore.get('glowRepeats')),
+    speedFactor: glowSpeedFactor(configStore.get('glowSpeed')),
+    verbose: configStore.get('verboseMode') !== false,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -206,17 +217,6 @@ function constellationPayload() {
   return { stars: uiState.heldCues, total: uiState.heldTotal };
 }
 
-/** @param {BrowserWindow} window */
-function sendConstellation(window) {
-  if (!window.isDestroyed()) {
-    window.webContents.send('constellation', constellationPayload());
-  }
-}
-
-function broadcastConstellation() {
-  for (const window of overlayWindows) sendConstellation(window);
-}
-
 /**
  * Holds a cue during focus. Instead of vanishing into a counter it leaves a
  * dim star in the overlay's corner, so a glance shows how much accumulated.
@@ -229,26 +229,42 @@ function holdForConstellation(payload) {
     icon: typeof payload.icon === 'string' ? payload.icon : null,
   });
   if (uiState.heldCues.length > CONSTELLATION_MAX) uiState.heldCues.shift();
-  broadcastConstellation();
+  broadcast('constellation', constellationPayload());
   updateTray();
+}
+
+/**
+ * The final delivery step: hold for the constellation while focused,
+ * broadcast otherwise. Also the slack tide's release path, so focus is
+ * re-checked when a cue queued before focus mode began is let out.
+ * @param {object} payload
+ */
+function deliverFinal(payload) {
+  if (shouldDefer(payload, isFocused())) {
+    holdForConstellation(payload);
+  } else {
+    broadcastCue(payload);
+  }
 }
 
 /**
  * Routes a cue from any source (connector, webhook).
  * Priority: focus hold (constellation) → slack tide (wait for a typing
  * pause) → immediate broadcast. Tier 1 cues always go straight through.
- * @param {object} payload - already validated by the caller
+ * Validation happens here, once, so the router is safe for every source.
+ * @param {unknown} rawPayload
  */
-function deliverCue(payload) {
-  if (shouldDefer(payload, isFocused())) {
-    holdForConstellation(payload);
-    return;
-  }
-  if (slackTide && cueTier(payload) >= 2 && configStore.get('slackTideEnabled') !== false) {
+function deliverCue(rawPayload) {
+  const payload = sanitizeCuePayload(rawPayload);
+  if (!payload) return;
+
+  const heldByFocus = shouldDefer(payload, isFocused());
+  if (!heldByFocus && slackTide && cueTier(payload) >= 2
+      && configStore.get('slackTideEnabled') !== false) {
     slackTide.push(payload); // delivers immediately if the user is already pausing
     return;
   }
-  broadcastCue(payload);
+  deliverFinal(payload);
 }
 
 /** Called on every manual or detected focus transition. */
@@ -261,7 +277,7 @@ function onFocusChanged() {
     ));
     uiState.heldTotal = 0;
     uiState.heldCues = [];
-    broadcastConstellation(); // empty payload fades the stars out
+    broadcast('constellation', constellationPayload()); // empty list fades the stars out
   }
   updateTray();
 }
@@ -312,7 +328,7 @@ function createSettingsWindow() {
     height: 800,
     minWidth: 480,
     minHeight: 560,
-    title: 'FlowState Settings',
+    title: 'Periphery Settings',
     autoHideMenuBar: true,
     show: false, // Shown on ready-to-show so Mica never flashes white.
     ...(IS_WINDOWS ? {
@@ -349,7 +365,7 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Quit FlowState',
+      label: 'Quit Periphery',
       click: () => {
         isQuitting = true;
         app.quit();
@@ -358,33 +374,58 @@ function buildTrayMenu() {
   ]);
 }
 
+/** Badged variant of the tray icon, composited lazily; reset on accent change. */
+let trayBadgedIcon = null;
+/** Whether the tray currently shows the badge, so setImage runs on transitions only. */
+let trayShowsBadge = false;
+
+function badgedTrayIcon() {
+  if (!trayBadgedIcon) {
+    const { width, height } = trayBaseIcon.getSize();
+    trayBadgedIcon = nativeImage.createFromBitmap(
+      drawBadgeDot(trayBaseIcon.toBitmap(), width, height, uiState.accent),
+      { width, height },
+    );
+  }
+  return trayBadgedIcon;
+}
+
+/** Re-composites the badge (if shown) after the OS accent colour changes. */
+function refreshTrayBadge() {
+  trayBadgedIcon = null;
+  if (tray && trayShowsBadge) {
+    try {
+      tray.setImage(badgedTrayIcon());
+    } catch (err) {
+      console.error('[Tray] Could not composite badge dot', err);
+    }
+  }
+}
+
 /**
- * Keeps the tray truthful: menu checkbox, a tooltip that says what FlowState
- * is doing, and an accent-coloured badge dot while cues are being held.
+ * Keeps the tray truthful: a tooltip that says what Periphery is doing, and
+ * an accent-coloured badge dot while cues are being held. The context menu is
+ * static after createTray — the checkbox manages its own checked state.
  */
 function updateTray() {
   if (!tray) return;
 
-  tray.setContextMenu(buildTrayMenu());
-
   const held = uiState.heldTotal;
   tray.setToolTip(isFocused()
-    ? `FlowState — focus mode${held > 0 ? `, ${held} update${held === 1 ? '' : 's'} held` : ''}`
-    : 'FlowState — watching');
+    ? `Periphery — focus mode${held > 0 ? `, ${held} update${held === 1 ? '' : 's'} held` : ''}`
+    : 'Periphery — watching');
 
   if (!trayBaseIcon || trayBaseIcon.isEmpty()) return;
+  const wantBadge = held > 0;
+  if (wantBadge === trayShowsBadge) return;
+  trayShowsBadge = wantBadge;
   try {
-    if (held > 0) {
-      const { width, height } = trayBaseIcon.getSize();
-      const badged = drawBadgeDot(trayBaseIcon.toBitmap(), width, height, uiState.accent);
-      tray.setImage(nativeImage.createFromBitmap(badged, { width, height }));
-    } else {
-      tray.setImage(trayBaseIcon);
-    }
+    tray.setImage(wantBadge ? badgedTrayIcon() : trayBaseIcon);
   } catch (err) {
     // The badge is decoration; never let it take the tray icon down with it.
     console.error('[Tray] Could not composite badge dot', err);
     tray.setImage(trayBaseIcon);
+    trayShowsBadge = false;
   }
 }
 
@@ -398,6 +439,7 @@ function createTray() {
 
   tray = new Tray(trayBaseIcon);
   tray.on('click', createSettingsWindow);
+  tray.setContextMenu(buildTrayMenu());
   updateTray();
 }
 
@@ -409,9 +451,9 @@ function initConnectors() {
   connectorManager.stopAll(); // Stop existing before reloading
 
   if (configStore.get('pomodoroEnabled')) {
-    const minutes = Number(configStore.get('pomodoroMinutes'));
     connectorManager.register('pomodoro', new TimeoutConnector({
-      durationMs: (Number.isFinite(minutes) ? minutes : 25) * 60 * 1000,
+      // Same clamp as the save path, so a bad value on disk can't bypass it.
+      durationMs: clampNumber(configStore.get('pomodoroMinutes'), 1, 240, 25) * 60 * 1000,
       cueName: 'glow-pulse',
       color: 'rgba(0, 200, 255, 0.6)',
       message: 'Time for a quick stretch!',
@@ -421,7 +463,7 @@ function initConnectors() {
   if (configStore.get('gitlabEnabled') && configStore.get('gitlabProjectId')) {
     connectorManager.register('gitlab-1', new GitLabConnector({
       projectId: configStore.get('gitlabProjectId'),
-      patKey: GITLAB_PAT_KEY,
+      patKey: SECRET_KEYS.gitlabPat,
       secretStore: secureStore,
       pollIntervalMs: 30 * 1000,
     }));
@@ -429,7 +471,7 @@ function initConnectors() {
 
   if (configStore.get('outlookEnabled') && configStore.get('outlookEmail')) {
     connectorManager.register('outlook-1', new OutlookConnector({
-      tokenKey: OUTLOOK_TOKEN_KEY,
+      tokenKey: SECRET_KEYS.outlookToken,
       userEmail: configStore.get('outlookEmail'),
       secretStore: secureStore,
       pollIntervalMs: 60 * 1000,
@@ -441,25 +483,12 @@ function initConnectors() {
 // IPC
 // ---------------------------------------------------------------------------
 
-/**
- * @param {unknown} value
- * @param {number} min
- * @param {number} max
- * @param {number} fallback
- * @returns {number}
- */
-function clampNumber(value, min, max, fallback) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(num)));
-}
-
 function registerIpcHandlers() {
   ipcMain.handle('get-config', () => ({
     ...configStore.getAll(),
     // Never return secrets to the renderer; only whether one is stored.
-    hasGitlabPat: secureStore.hasSecret(GITLAB_PAT_KEY),
-    hasOutlookToken: secureStore.hasSecret(OUTLOOK_TOKEN_KEY),
+    hasGitlabPat: secureStore.hasSecret(SECRET_KEYS.gitlabPat),
+    hasOutlookToken: secureStore.hasSecret(SECRET_KEYS.outlookToken),
     // Presentation-only extras so the settings UI can match the OS.
     accentColor: accentCss(uiState.accent, 1),
     isWindows: IS_WINDOWS,
@@ -470,9 +499,12 @@ function registerIpcHandlers() {
       return { success: false, error: 'Invalid settings payload' };
     }
 
+    const connectorConfigBefore = CONNECTOR_CONFIG_KEYS.map((key) => configStore.get(key));
+
     configStore.setMany({
       verboseMode: Boolean(config.verboseMode),
       glowRepeats: clampRepeats(config.glowRepeats),
+      glowSpeed: clampNumber(config.glowSpeed, GLOW_SPEED_MIN, GLOW_SPEED_MAX, GLOW_SPEED_DEFAULT),
       respectFocusAssist: Boolean(config.respectFocusAssist),
       slackTideEnabled: Boolean(config.slackTideEnabled),
       pomodoroEnabled: Boolean(config.pomodoroEnabled),
@@ -485,14 +517,21 @@ function registerIpcHandlers() {
 
     // Secrets are only written when the user actually typed one, so leaving
     // the field blank keeps the existing credential.
+    let secretsChanged = false;
     for (const [field, key] of Object.entries(SECRET_KEYS)) {
       const value = config[field];
       if (typeof value === 'string' && value.length > 0) {
         secureStore.setSecret(key, value);
+        secretsChanged = true;
       }
     }
 
-    initConnectors();
+    // Restarting connectors refires their baseline API fetches, so skip it
+    // when the save only touched cosmetic settings.
+    if (secretsChanged
+        || CONNECTOR_CONFIG_KEYS.some((key, i) => configStore.get(key) !== connectorConfigBefore[i])) {
+      initConnectors();
+    }
     syncFocusMonitor();
     onFocusChanged(); // Turning "respect Focus Assist" off must release held cues.
     if (slackTide && configStore.get('slackTideEnabled') === false) {
@@ -515,7 +554,7 @@ function registerIpcHandlers() {
     broadcastCue({
       cue: typeof cue === 'string' ? cue : 'glow-pulse',
       color: accentCss(uiState.accent, 0.7),
-      msg: 'FlowState test cue',
+      msg: 'Periphery test cue',
       icon: 'alert',
     });
     return { success: true };
@@ -529,7 +568,7 @@ function registerIpcHandlers() {
 function main() {
   // A stable AppUserModelID keeps the tray identity and any future toasts
   // grouped under one app on Windows instead of under "electron.app".
-  if (IS_WINDOWS) app.setAppUserModelId('com.flowstate.poc');
+  if (IS_WINDOWS) app.setAppUserModelId('com.periphery.poc');
 
   app.whenReady().then(() => {
     refreshAccent();
@@ -541,16 +580,7 @@ function main() {
     syncFocusMonitor();
 
     slackTide = new SlackTideQueue({
-      // Focus is re-checked at release time: a cue queued in the tide before
-      // focus mode began must join the constellation, not break through when
-      // the tide flushes mid-focus.
-      deliver: (payload) => {
-        if (shouldDefer(payload, isFocused())) {
-          holdForConstellation(payload);
-        } else {
-          broadcastCue(payload);
-        }
-      },
+      deliver: deliverFinal,
       getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
     });
 
@@ -558,17 +588,17 @@ function main() {
     initConnectors();
 
     // Displays come and go (docking, projectors); keep one overlay on each.
-    screen.on('display-added', scheduleOverlayRebuild);
-    screen.on('display-removed', scheduleOverlayRebuild);
-    screen.on('display-metrics-changed', scheduleOverlayRebuild);
+    screen.on('display-added', scheduleOverlaySync);
+    screen.on('display-removed', scheduleOverlaySync);
+    screen.on('display-metrics-changed', scheduleOverlaySync);
 
     // Follow the OS: accent repaints cues and the tray badge, battery state
     // switches the overlay into its low-power animation profile.
     if (IS_WINDOWS) {
       systemPreferences.on('accent-color-changed', () => {
         refreshAccent();
-        broadcastTheme();
-        updateTray();
+        broadcast('set-theme', themePayload());
+        refreshTrayBadge();
       });
       nativeTheme.on('updated', () => {
         if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -578,16 +608,15 @@ function main() {
     }
     powerMonitor.on('on-battery', () => {
       uiState.onBattery = true;
-      broadcastTheme();
+      broadcast('set-theme', themePayload());
     });
     powerMonitor.on('on-ac', () => {
       uiState.onBattery = false;
-      broadcastTheme();
+      broadcast('set-theme', themePayload());
     });
 
     webhookServer = startWebhookServer({
       onCue: deliverCue,
-      port: DEFAULT_PORT,
       onError: (err) => {
         const detail = err.code === 'EADDRINUSE'
           ? `port ${DEFAULT_PORT} is already in use`
@@ -610,7 +639,7 @@ function main() {
     app.whenReady().then(createSettingsWindow);
   });
 
-  // FlowState lives in the tray, so closing a window must not end the session.
+  // Periphery lives in the tray, so closing a window must not end the session.
   // Quitting happens through the tray menu, which sets isQuitting first.
   app.on('window-all-closed', () => {
     if (isQuitting) app.quit();

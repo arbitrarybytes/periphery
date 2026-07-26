@@ -48,18 +48,18 @@ const CUE_TIERS = Object.freeze({
 });
 
 /**
- * @param {{cue?: string, icon?: string}} payload
+ * @param {{cue?: string, urgent?: boolean}} payload
  * @returns {number}
  */
 function cueTier(payload) {
-  // Meeting reminders are time-critical; holding one until focus ends would
-  // defeat its purpose, so the calendar icon always rides at tier 1.
-  if (payload.icon === 'calendar') return 1;
+  // `urgent` is the explicit, validated escalation knob (time-critical cues
+  // like meeting reminders); it outranks whatever the cue name implies.
+  if (payload.urgent === true) return 1;
   return CUE_TIERS[payload.cue] ?? 2;
 }
 
 /**
- * @param {{cue?: string, icon?: string}} payload
+ * @param {{cue?: string, urgent?: boolean}} payload
  * @param {boolean} focused
  * @returns {boolean} whether the cue should be held until focus ends
  */
@@ -71,7 +71,7 @@ function shouldDefer(payload, focused) {
  * SHQueryUserNotificationState value meaning "Windows would show a toast".
  * Every other documented state (busy, D3D full screen, presentation mode,
  * quiet time, Focus Assist / Do Not Disturb) means the OS itself would
- * suppress or queue a notification, so FlowState should hold its cues too.
+ * suppress or queue a notification, so Periphery should hold its cues too.
  */
 const QUNS_ACCEPTS_NOTIFICATIONS = 5;
 const QUNS_MIN = 1;
