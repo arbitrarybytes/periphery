@@ -148,6 +148,22 @@ swap. Install both if you like; run one at a time. The numbering rules,
 promotion checklist, and co-existence constraints are in
 [ai-native/versioning.md](ai-native/versioning.md).
 
+### Quickest way: the launcher
+
+`scripts/run.ps1` picks an edition, enforces the one-at-a-time rule, and tells
+you which edition is holding the port instead of failing obscurely.
+
+```powershell
+.\scripts\run.ps1                          # Node edition (default)
+.\scripts\run.ps1 -Edition tauri           # Rust preview
+.\scripts\run.ps1 -Edition tauri -Force    # replace whatever is running
+.\scripts\run.ps1 -Edition tauri -Release  # optimised build
+.\scripts\run.ps1 -Stop                    # shut down
+```
+
+Add `-Devtools` to open devtools on the first Tauri overlay. `Get-Help
+.\scripts\run.ps1 -Full` documents the rest.
+
 ### Node edition (stable)
 
 ```bash
