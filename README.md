@@ -1,4 +1,4 @@
-# <img src="assets/icon.svg" width="28" alt="" align="top"> Periphery
+# <img src="ui/assets/icon.svg" width="28" alt="" align="top"> Periphery
 
 **Periphery** is a local-first, unobtrusive notification system designed specifically for deep-work professionals and enterprise developers.
 
@@ -17,7 +17,26 @@ Renderer processes run sandboxed with context isolation and a restrictive CSP; t
 
 ## Architecture
 
-Periphery is currently prototyped using **Electron**, which gives us transparent, click-through overlays — one per connected display — that never steal focus.
+Periphery is **migrating from Electron to Tauri 2** ([ADR 4](ai-native/ADR.md)). Both
+shells drive the same frontend in [`ui/`](ui/) and the same behaviour; the Electron build
+stays runnable until the Tauri shell is proven, so there is never a window with no working app.
+
+```
+src-tauri/               Rust backend (Tauri 2) — the destination
+  src/cue.rs             Allowlist validation for untrusted cue payloads
+  src/tiers.rs           Attention hierarchy, focus deferral, flush summary
+  src/blocked.rs         Blocked-agent state + age escalation
+  src/slack_tide.rs      Hold-until-pause delivery queue
+  src/agent_beacon.rs    Acknowledgment watcher for completion beacons
+  src/digest.rs          End-of-focus / while-you-were-away digests
+  src/focus.rs           Native SHQueryUserNotificationState (no PowerShell)
+  src/clock.rs           Injectable clock + input-idle source (testability)
+```
+
+Building the Tauri app needs the Rust toolchain plus the MSVC C++ build tools;
+`npm start` (Electron) needs neither.
+
+The Electron shell, still in place:
 
 ```
 main.js                  Window/tray lifecycle, IPC, connector wiring
@@ -35,9 +54,9 @@ utils/trayBadge.js       Accent badge-dot compositing for the tray icon
 utils/stores/            Config + encrypted secret persistence
 cli/periphery.js         `periphery` CLI (notify / done / health)
 mcp/server.js            Local MCP server for coding agents (stdio)
-preload*.js              contextBridge APIs
-renderer.js, styles.css  The overlay itself
-website/                 Static landing page (plain HTML/CSS/JS; not part of the app)
+preload*.js              contextBridge APIs (Electron only; removed after the port)
+ui/                      Frontend: overlay, settings, onboarding (shared by both shells)
+docs/                    Static landing page (GitHub Pages; not part of the app)
 ```
 
 ### The Connector Engine

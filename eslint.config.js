@@ -23,7 +23,7 @@ module.exports = [
   },
   {
     // Sandboxed renderer scripts: browser globals plus the preload bridges.
-    files: ['renderer.js', 'settings.js', 'onboarding.js'],
+    files: ['ui/renderer.js', 'ui/settings.js', 'ui/onboarding.js'],
     languageOptions: {
       globals: { ...globals.browser },
     },

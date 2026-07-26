@@ -186,7 +186,7 @@ function createOverlayWindow(display) {
     }
   });
 
-  window.loadFile('index.html');
+  window.loadFile('ui/index.html');
   return window;
 }
 
@@ -519,7 +519,7 @@ function createSettingsWindow() {
   });
 
   settingsWindow.once('ready-to-show', () => settingsWindow.show());
-  settingsWindow.loadFile('settings.html');
+  settingsWindow.loadFile('ui/settings.html');
   settingsWindow.on('closed', () => {
     settingsWindow = null;
   });
@@ -552,7 +552,7 @@ function createOnboardingWindow() {
     },
   });
   onboardingWindow.once('ready-to-show', () => onboardingWindow.show());
-  onboardingWindow.loadFile('onboarding.html');
+  onboardingWindow.loadFile('ui/onboarding.html');
   onboardingWindow.on('closed', () => {
     onboardingWindow = null;
   });
@@ -681,11 +681,11 @@ function updateTray() {
 }
 
 function createTray() {
-  trayBaseIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
+  trayBaseIcon = nativeImage.createFromPath(path.join(__dirname, 'ui', 'assets', 'tray.png'));
   if (trayBaseIcon.isEmpty()) {
     // A blank tray icon would leave the user with no way to reach Settings or
     // Quit, so make the cause obvious rather than shipping an invisible tray.
-    console.error('[Tray] assets/tray.png could not be loaded; the tray icon will be blank.');
+    console.error('[Tray] ui/assets/tray.png could not be loaded; the tray icon will be blank.');
   }
 
   tray = new Tray(trayBaseIcon);
