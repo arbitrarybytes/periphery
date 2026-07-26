@@ -29,16 +29,36 @@ Any process running as your user can still post cues. Treat the endpoint as an "
 
 | Field    | Required | Accepted values |
 | -------- | -------- | --------------- |
-| `cue`    | yes      | `glow`, `glow-bottom`, `glow-pulse`, `glow-agent`, `comet` |
+| `cue`    | yes      | `glow`, `glow-bottom`, `glow-pulse`, `glow-agent`, `glow-blocked`, `comet` |
 | `color`  | no       | `#rgb` / `#rrggbb` / `#rrggbbaa`, `rgb(...)`, `rgba(...)`, or a colour keyword |
 | `msg`    | no       | Text for the kinetic-typography pill, up to 160 characters |
-| `icon`   | no       | `gitlab`, `github`, `outlook`, `calendar`, `pomodoro`, `alert`, `agent` — bundled icons only, **not** a URL |
+| `icon`   | no       | `gitlab`, `github`, `outlook`, `calendar`, `pomodoro`, `alert`, `agent`, `blocked` — bundled icons only, **not** a URL |
+| `ref`    | no       | Correlation id for a **state cue**, so you can clear exactly what you set. `[A-Za-z0-9._:-]`, 64 chars max |
 | `urgent` | no       | `true` to deliver at the highest attention tier: pierces focus mode and skips the typing-pause hold. Use sparingly. |
 
 `glow-agent` is the persistent corner beacon built for coding agents: it stays
 on screen until the user is back at the keyboard, then replays its message
 once. See [agents.md](agents.md) — and prefer the `periphery` CLI or the MCP
 server over hand-rolled requests for that use case.
+
+## State cues and `POST /resolve`
+
+Most cues announce an *event* and expire on their own. **State cues** say
+something is *true right now* and persist until cleared. `glow-blocked` — an
+agent waiting on the user's approval — is the first; it also escalates with
+age. `GET /health` lists them under `stateCues`.
+
+Clear one with `POST /resolve`:
+
+```bash
+curl -X POST http://127.0.0.1:49123/resolve -d '{"ref":"mig-1"}'   # one
+curl -X POST http://127.0.0.1:49123/resolve -d '{"all":true}'      # everything
+```
+
+The response carries `cleared`, the number actually cleared, so a caller can
+tell "I cleared it" from "nothing was waiting". A request naming neither a
+`ref` nor `all` is a `400`. Setting a state cue twice with the same `ref`
+refreshes its message without resetting its escalation clock.
 
 `GET /health` returns the exact lists the running build accepts.
 

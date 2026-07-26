@@ -137,11 +137,38 @@
     }, 12000);
   }
 
+  /**
+   * The blocked beacon, demo edition. It runs the real escalation curve with
+   * the clock compressed — level 1 at 4s and level 2 at 8s instead of 1 and 4
+   * minutes — so a visitor can watch the whole thing in about fifteen seconds.
+   * In the app nothing clears it but an answer.
+   */
+  let demoBlocked = null;
+  function blockedBeacon() {
+    if (demoBlocked) return;
+    const el = document.createElement("div");
+    el.className = "cue-blocked-demo";
+    stage.appendChild(el);
+    demoBlocked = el;
+
+    setTimeout(() => el.classList.add("level-1"), 4000);
+    setTimeout(() => {
+      el.classList.remove("level-1");
+      el.classList.add("level-2");
+    }, 8000);
+    setTimeout(() => {
+      el.style.transition = "opacity 1.2s ease";
+      el.style.opacity = "0";
+      setTimeout(() => { el.remove(); demoBlocked = null; }, 1300);
+    }, 15000);
+  }
+
   const CUES = {
     comet: () => comet(COLORS.t1),
     edge: () => edgeGlow(COLORS.t2),
     bottom: () => bottomGlow(COLORS.t3),
     beacon: agentBeacon,
+    blocked: blockedBeacon,
   };
 
   document.querySelectorAll("[data-cue]").forEach((btn) =>

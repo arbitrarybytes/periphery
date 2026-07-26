@@ -47,6 +47,9 @@ const CUE_TIERS = Object.freeze({
   // Agent completions are awareness-class; persistence, not urgency, is what
   // makes them hard to miss (see utils/agentBeacon.js).
   'glow-agent': 2,
+  // A blocked agent is also awareness-class at first sight — it earns its
+  // insistence by *aging*, not by arriving (see utils/blockedAgents.js).
+  'glow-blocked': 2,
   'glow-bottom': 3,
 });
 

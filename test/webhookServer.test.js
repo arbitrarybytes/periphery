@@ -12,7 +12,13 @@ const { startWebhookServer, HOST } = require('../server/webhookServer');
  */
 async function withServer() {
   const cues = [];
-  const server = startWebhookServer({ onCue: (payload) => cues.push(payload), port: 0 });
+  const resolves = [];
+  const server = startWebhookServer({
+    onCue: (payload) => cues.push(payload),
+    // Pretends one blocked agent was cleared, so the response shape is exercised.
+    onResolve: (request) => { resolves.push(request); return 1; },
+    port: 0,
+  });
   await new Promise((resolve, reject) => {
     server.once('listening', resolve);
     server.once('error', reject);
@@ -22,8 +28,17 @@ async function withServer() {
   return {
     port,
     cues,
+    resolves,
     close: () => new Promise((resolve) => server.close(resolve)),
   };
+}
+
+function postTo(port, path, body) {
+  return fetch(`http://127.0.0.1:${port}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 function post(port, body, headers = {}) {
@@ -195,5 +210,55 @@ test('a port collision is reported instead of throwing', async () => {
     second.close();
   } finally {
     await first.close();
+  }
+});
+
+// --- /resolve: the clear half of the state-cue primitive --------------------
+
+test('/resolve clears a blocked agent by ref', async () => {
+  const { port, resolves, close } = await withServer();
+  try {
+    const res = await postTo(port, '/resolve', { ref: 'mig-1' });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.cleared, 1);
+    assert.deepEqual(resolves, [{ ref: 'mig-1', all: false }]);
+  } finally {
+    await close();
+  }
+});
+
+test('/resolve accepts {all: true}', async () => {
+  const { port, resolves, close } = await withServer();
+  try {
+    const res = await postTo(port, '/resolve', { all: true });
+    assert.equal(res.status, 200);
+    assert.deepEqual(resolves, [{ all: true }]);
+  } finally {
+    await close();
+  }
+});
+
+test('/resolve rejects a request that names nothing', async () => {
+  const { port, resolves, close } = await withServer();
+  try {
+    const res = await postTo(port, '/resolve', {});
+    assert.equal(res.status, 400);
+    assert.equal(resolves.length, 0);
+  } finally {
+    await close();
+  }
+});
+
+test('/health advertises the state cues', async () => {
+  const { port, close } = await withServer();
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${port}/health`)).json();
+    assert.ok(body.cues.includes('glow-blocked'));
+    assert.deepEqual(body.stateCues, ['glow-blocked']);
+    assert.ok(body.icons.includes('blocked'));
+  } finally {
+    await close();
   }
 });

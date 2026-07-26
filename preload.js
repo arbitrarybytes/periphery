@@ -45,6 +45,14 @@ contextBridge.exposeInMainWorld('periphery', {
     ipcRenderer.on('digest', (event, data) => handler(data));
   },
   /**
+   * Blocked-agent state: how many agents are waiting on approval and how
+   * insistent the beacon should be. A count of 0 fades it out.
+   * @param {(state: object) => void} handler
+   */
+  onBlocked(handler) {
+    ipcRenderer.on('blocked-agents', (event, state) => handler(state));
+  },
+  /**
    * Asks the main process for real mouse events while the pointer is over
    * the digest panel; false restores the overlay's click-through state.
    * @param {boolean} interactive

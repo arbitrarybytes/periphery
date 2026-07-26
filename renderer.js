@@ -9,7 +9,9 @@
 /** Cues rendered as a `cue-<name>` glow element; comet and the persistent
  * agent beacon are handled apart. */
 const GLOW_CUES = ['glow', 'glow-bottom', 'glow-pulse'];
-const ICON_NAMES = ['gitlab', 'github', 'outlook', 'calendar', 'pomodoro', 'alert', 'agent'];
+const ICON_NAMES = [
+  'gitlab', 'github', 'outlook', 'calendar', 'pomodoro', 'alert', 'agent', 'blocked',
+];
 
 const PULSE_DURATION_MS = 1500;
 const BREATHE_DURATION_MS = 4000;
@@ -169,10 +171,62 @@ window.periphery.onAgentAck(() => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Blocked-agent beacon: a *state* cue, not an event. It stays until the agent
+// is unblocked or the user dismisses it, and it escalates with age — level 0
+// is as quiet as the completion beacon, level 2 is insistent. The main process
+// owns the escalation clock (utils/blockedAgents.js) and pushes state here.
+// ---------------------------------------------------------------------------
+
+let blockedEl = null;
+
+/**
+ * @param {{count: number, level: number, entries: Array<object>}} state
+ */
+function renderBlocked(state) {
+  if (state.count === 0) {
+    if (blockedEl) {
+      const el = blockedEl;
+      blockedEl = null;
+      el.classList.add('blocked-clearing');
+      setTimeout(() => el.remove(), 900);
+    }
+    return;
+  }
+
+  if (!blockedEl) {
+    blockedEl = document.createElement('div');
+    blockedEl.classList.add('cue-glow-blocked');
+    container.appendChild(blockedEl);
+  }
+
+  // Level drives intensity, size, and rhythm entirely through CSS.
+  blockedEl.classList.remove('blocked-level-1', 'blocked-level-2');
+  if (state.level >= 1) blockedEl.classList.add(`blocked-level-${Math.min(2, state.level)}`);
+
+  const first = state.entries[0];
+  if (first && typeof first.color === 'string') {
+    blockedEl.style.setProperty('--blocked-color', first.color);
+  }
+  blockedEl.dataset.count = String(state.count);
+}
+
+window.periphery.onBlocked((state) => {
+  if (state === null || typeof state !== 'object' || typeof state.count !== 'number') return;
+  renderBlocked(state);
+});
+
 window.periphery.onCue((payload) => {
   if (payload === null || typeof payload !== 'object') return;
 
   const { cue, color, msg, icon, repeats, verbose, speedFactor } = payload;
+
+  // The blocked beacon itself is driven by onBlocked state, not by the cue
+  // stream; the cue only carries the message pill announcing it.
+  if (cue === 'glow-blocked') {
+    if (msg && verbose !== false) triggerText(msg, color, icon);
+    return;
+  }
 
   if (cue === 'comet') {
     triggerComet(color);

@@ -2,7 +2,9 @@
 
 const express = require('express');
 
-const { sanitizeCuePayload, CUE_NAMES, ICON_NAMES } = require('../utils/cuePayload');
+const {
+  sanitizeCuePayload, sanitizeResolvePayload, CUE_NAMES, STATE_CUES, ICON_NAMES,
+} = require('../utils/cuePayload');
 
 const DEFAULT_PORT = 49123;
 /** Loopback only. Never widen this: the receiver is unauthenticated by design. */
@@ -40,9 +42,11 @@ function isLoopbackHost(header) {
  *
  * @param {object} options
  * @param {(payload: object) => void} options.onCue - called with a validated payload
+ * @param {(request: {ref?: string, all: boolean}) => number} [options.onResolve]
+ *   clears a state cue (see STATE_CUES); returns how many were cleared
  * @returns {import('express').Express}
  */
-function createWebhookApp({ onCue }) {
+function createWebhookApp({ onCue, onResolve }) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -64,7 +68,9 @@ function createWebhookApp({ onCue }) {
   app.use(express.json({ limit: BODY_LIMIT }));
 
   app.get('/health', (req, res) => {
-    res.json({ success: true, cues: CUE_NAMES, icons: ICON_NAMES });
+    res.json({
+      success: true, cues: CUE_NAMES, stateCues: STATE_CUES, icons: ICON_NAMES,
+    });
   });
 
   app.post('/notify', (req, res) => {
@@ -79,6 +85,28 @@ function createWebhookApp({ onCue }) {
 
     onCue(payload);
     res.status(200).json({ success: true, message: `Triggered ${payload.cue}` });
+  });
+
+  // Clears a state cue. `{"ref": "..."}` clears one, `{"all": true}` clears
+  // every one — the counterpart to posting a `glow-blocked` cue.
+  app.post('/resolve', (req, res) => {
+    const request = sanitizeResolvePayload(req.body);
+    if (!request) {
+      res.status(400).json({
+        success: false,
+        error: 'Send {"ref": "<id>"} or {"all": true}',
+      });
+      return;
+    }
+
+    const cleared = onResolve ? onResolve(request) : 0;
+    res.status(200).json({
+      success: true,
+      cleared,
+      message: cleared > 0
+        ? `Cleared ${cleared} blocked agent${cleared === 1 ? '' : 's'}`
+        : 'Nothing was waiting',
+    });
   });
 
   // Malformed JSON reaches here as a SyntaxError from express.json().
@@ -101,8 +129,8 @@ function createWebhookApp({ onCue }) {
  *   when the port is already taken (a second instance, or another app).
  * @returns {import('http').Server}
  */
-function startWebhookServer({ onCue, port = DEFAULT_PORT, onError }) {
-  const app = createWebhookApp({ onCue });
+function startWebhookServer({ onCue, onResolve, port = DEFAULT_PORT, onError }) {
+  const app = createWebhookApp({ onCue, onResolve });
   const server = app.listen(port, HOST, () => {
     console.log(`Periphery local hook listening on http://${HOST}:${port}`);
   });

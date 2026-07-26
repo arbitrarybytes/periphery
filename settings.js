@@ -90,6 +90,8 @@ async function loadConfig() {
   $('digestEnabled').checked = config.digestEnabled !== false;
   $('awaySummaryEnabled').checked = config.awaySummaryEnabled !== false;
   $('agentCuesEnabled').checked = config.agentCuesEnabled !== false;
+  $('blockedCuesEnabled').checked = config.blockedCuesEnabled !== false;
+  $('blockedPiercesFocus').checked = config.blockedPiercesFocus !== false;
   $('glowRepeats').value = config.glowRepeats ?? REPEATS_DEFAULT;
   $('glowSpeed').value = config.glowSpeed ?? SPEED_DEFAULT;
   renderSpeedLabel();
@@ -145,6 +147,8 @@ async function save() {
     digestEnabled: $('digestEnabled').checked,
     awaySummaryEnabled: $('awaySummaryEnabled').checked,
     agentCuesEnabled: $('agentCuesEnabled').checked,
+    blockedCuesEnabled: $('blockedCuesEnabled').checked,
+    blockedPiercesFocus: $('blockedPiercesFocus').checked,
 
     pomodoroEnabled: $('pomodoroEnabled').checked,
     pomodoroMinutes,

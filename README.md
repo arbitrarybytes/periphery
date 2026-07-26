@@ -29,6 +29,7 @@ utils/focusAssist.js     Focus Assist / DND poller (SHQueryUserNotificationState
 utils/teamsPresence.js   Teams presence poller (Microsoft Graph /me/presence)
 utils/slackTide.js       Hold-until-pause delivery queue (Slack Tide)
 utils/agentBeacon.js     Acknowledgment watcher for persistent agent cues
+utils/blockedAgents.js   Blocked-agent state + age escalation (state cues)
 utils/digest.js          End-of-focus / while-you-were-away digest bookkeeping
 utils/trayBadge.js       Accent badge-dot compositing for the tray icon
 utils/stores/            Config + encrypted secret persistence
@@ -65,6 +66,7 @@ Beyond *how* a cue looks, Periphery decides *when* it deserves your eyes:
 *   **The end-of-focus digest.** When focus ends you get more than a tally, if you want it: an expandable card on the primary display lists each held update with its source and time. It is the overlay's only interactive surface — the window grants it real mouse events just while the pointer is over it — and it dismisses itself if ignored. Toggleable in Settings.
 *   **"While you were away."** Unlocking after 30+ minutes greets you with the same digest for everything that arrived while the screen was locked, announced by one quiet glow. Toggleable in Settings.
 *   **The agent beacon (`glow-agent`).** Coding-agent completions get their own cue variant: a violet glow breathing in the bottom-right corner that *does not expire* — it waits until you are demonstrably back at the keyboard, then replays its message once and fades. A subtle glow can be missed; the beacon cannot. See [ai-native/agents.md](ai-native/agents.md). Toggleable in Settings (off = agent cues render as a normal glow).
+*   **The blocked beacon (`glow-blocked`).** The one cue that gets *more* insistent on its own. When a coding agent stalls waiting for your approval it burns wall-clock time every second, so a coral beacon in the bottom-left corner escalates with age — brighter, larger, faster — bounded at three levels, never a comet and never a sound. Critically, **being back at the keyboard does not clear it**: presence is not approval. It clears when the agent reports itself unblocked, when you dismiss it from the tray, or after a one-hour safety timeout. Pierces focus mode by default (it is your own delegated work asking); both behaviours are Settings toggles. See [ai-native/agents.md](ai-native/agents.md).
 *   **Teams presence sync.** Opt-in: Periphery polls Microsoft Graph `/me/presence`, and being in a call, presenting, or on Do Not Disturb (including Teams "Focusing") holds ambient cues exactly like Focus Assist. Fails open — an expired token can never leave cues muted.
 
 Delivery priority for every cue: focus hold (constellation) → slack tide (wait for a pause) → immediate. Tier 1 cues and meeting reminders always go straight through; agent beacons skip the tide because persistence makes pause-timing moot.
@@ -131,6 +133,17 @@ Invoke-RestMethod -Uri http://127.0.0.1:49123/notify -Method POST -Body '{"cue":
 ## Integrating Your Tools
 To learn how to integrate your existing local tools (Git, npm, CI/CD) using the Local Webhook, please read the [Webhook Integration Guide](ai-native/webhooks.md).
 
+## Setting Up Your Accounts
+
+Step-by-step setup for Outlook.com (personal Microsoft account) and a GitHub
+repository — including the token gotchas — is in
+[ai-native/getting-started.md](ai-native/getting-started.md).
+
 ## Where Periphery Goes Next
 
 Proposed vNext directions — new delivery channels, connectors, and friction removal — are collected in [ai-native/vnext.md](ai-native/vnext.md).
+
+A deeper analysis of where ambient notification is uniquely valuable across the
+Developer, Product Manager, and Executive loops — including the four missing
+primitives that unlock most of it — is in
+[ai-native/opportunities.md](ai-native/opportunities.md).

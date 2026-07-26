@@ -30,11 +30,12 @@ test('initialize advertises the tools capability', async () => {
   assert.equal(response.result.serverInfo.name, 'periphery');
 });
 
-test('tools/list exposes task_complete and notify', async () => {
+test('every tool is described well enough for an agent to act on', async () => {
   const { postCue } = okPost();
   const response = await handleMessage(rpc('tools/list'), postCue);
   const names = response.result.tools.map((tool) => tool.name);
-  assert.deepEqual(names.sort(), ['notify', 'task_complete']);
+  // The blocked pair is covered in stateCues.test.js.
+  assert.deepEqual(names.sort(), ['notify', 'task_blocked', 'task_complete', 'task_unblocked']);
   for (const tool of TOOLS) {
     assert.ok(tool.description.length > 20, `${tool.name} needs a description agents can act on`);
     assert.equal(tool.inputSchema.type, 'object');

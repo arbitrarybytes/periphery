@@ -114,6 +114,34 @@
       bottom-right corner until you are back at the keyboard, then replay
       their message once. Off: they render as a normal one-shot glow.
     </p>
+
+    <div class="form-group row">
+      <label for="blockedCuesEnabled">Escalate agents waiting on approval</label>
+      <label class="switch">
+        <input type="checkbox" id="blockedCuesEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      An agent blocked on your approval wastes time every second it waits, so
+      its beacon (bottom-left, <code>glow-blocked</code>) grows brighter and
+      more insistent with age — never a comet, never a sound. Being back at
+      the keyboard does not clear it; only answering the agent, or dismissing
+      it from the tray, does. Off: it renders as a normal completion beacon.
+    </p>
+
+    <div class="form-group row">
+      <label for="blockedPiercesFocus">…even during focus mode</label>
+      <label class="switch">
+        <input type="checkbox" id="blockedPiercesFocus">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="hint">
+      On by default: a blocked agent is your own delegated work asking for the
+      one thing only you can give. Off: it is held like any other ambient cue
+      and appears in the constellation.
+    </p>
   </div>
 
   <div class="section" id="windowsSection">

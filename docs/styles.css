@@ -598,6 +598,74 @@ main { position: relative; z-index: 1; }
 
 .beacon-trigger { flex: none; }
 
+/* The blocked variant of the banner: coral, and it escalates. */
+.blocked-banner {
+  --tier: #ff7a59;
+  background: linear-gradient(120deg, rgba(255, 122, 89, 0.08), var(--panel) 60%);
+  border-color: rgba(255, 122, 89, 0.28);
+}
+
+.blocked-banner::after {
+  right: auto;
+  left: -60px;
+  background: radial-gradient(circle, rgba(255, 122, 89, 0.22), transparent 70%);
+}
+
+.blocked-banner .tier-tag { color: #ff7a59; }
+
+/* The demo blocked beacon: runs the real escalation curve, compressed so a
+   visitor sees all three levels in about twelve seconds instead of four
+   minutes. Bottom-left, mirroring the app. */
+.cue-blocked-demo {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  height: 300px;
+  --bmin: 0.3;
+  --bmax: 0.72;
+  background: radial-gradient(circle at 0% 100%, rgba(255, 122, 89, 0.9) 0%, transparent 60%);
+  animation: blockedAsk 5s ease-in-out infinite;
+  transition: width 0.8s ease, height 0.8s ease;
+}
+
+.cue-blocked-demo::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 12px 4px rgba(255, 122, 89, 0.9);
+}
+
+.cue-blocked-demo.level-1 {
+  --bmin: 0.46;
+  --bmax: 0.88;
+  width: 380px;
+  height: 380px;
+  animation-duration: 3.5s;
+}
+
+.cue-blocked-demo.level-2 {
+  --bmin: 0.62;
+  --bmax: 1;
+  width: 460px;
+  height: 460px;
+  animation-duration: 2.4s;
+}
+
+@keyframes blockedAsk {
+  0% { opacity: var(--bmin); }
+  10% { opacity: var(--bmax); }
+  20% { opacity: calc(var(--bmin) + 0.05); }
+  30% { opacity: var(--bmax); }
+  45% { opacity: var(--bmin); }
+  100% { opacity: var(--bmin); }
+}
+
 /* The demo beacon fired on the page itself: persistent-ish corner glow */
 .cue-agent-demo {
   position: absolute;
@@ -1158,7 +1226,9 @@ main { position: relative; z-index: 1; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .marquee-track, .star, .brand-dot, .hint-dot, .caret { animation: none; }
-  .beacon-banner::after, .cue-agent-demo { animation: none; opacity: 0.6; }
+  .beacon-banner::after, .cue-agent-demo, .cue-blocked-demo { animation: none; opacity: 0.6; }
+  .cue-blocked-demo.level-1 { opacity: 0.75; }
+  .cue-blocked-demo.level-2 { opacity: 0.9; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .const-star { animation: none; }
   .tide-pill { animation: none; }

@@ -208,6 +208,107 @@ body.eco .cue-glow-agent {
 }
 
 /* =========================================
+   Cue: Blocked Agent (glow-blocked)
+   -----------------------------------------
+   A *state* cue for an agent waiting on your approval. It sits in the
+   bottom-left — opposite the completion beacon, so "done" and "waiting" are
+   never confused at a glance — and pulses in a two-beat rhythm (ask-ask-wait)
+   rather than the completion beacon's smooth breathe. Rhythm is legible in
+   peripheral vision even when colour is not.
+
+   It escalates with age, because a blocked agent wastes time continuously:
+     level 0  quiet, roughly as loud as the completion beacon
+     level 1  brighter, larger, faster rhythm
+     level 2  insistent — and still just light. Never a comet, never a sound.
+   ========================================= */
+.cue-glow-blocked {
+  /* Escalation rides on three channels at once — brightness, size, and
+     rhythm — because any one alone is weak in peripheral vision, and because
+     brightness has to keep working when animations are off. */
+  --blocked-min: 0.30;
+  --blocked-max: 0.72;
+  --blocked-floor: 0.4;
+
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  height: 300px;
+  pointer-events: none;
+  transition: opacity 0.9s ease, width 0.8s ease, height 0.8s ease;
+  background: radial-gradient(
+    circle at 0% 100%,
+    var(--blocked-color, rgba(255, 122, 89, 0.9)) 0%,
+    transparent 60%
+  );
+  animation: blocked-ask 5s ease-in-out infinite;
+}
+
+/* The anchor dot, mirroring the agent beacon's. */
+.cue-glow-blocked::after {
+  content: '';
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 14px 5px var(--blocked-color, rgba(255, 122, 89, 0.9));
+}
+
+/* Two beats then a pause: an ask, not an announcement. */
+@keyframes blocked-ask {
+  0% { opacity: var(--blocked-min); }
+  10% { opacity: var(--blocked-max); }
+  20% { opacity: calc(var(--blocked-min) + 0.05); }
+  30% { opacity: var(--blocked-max); }
+  45% { opacity: var(--blocked-min); }
+  100% { opacity: var(--blocked-min); }
+}
+
+/* Each level raises the whole opacity band, so a higher level is brighter at
+   every point in its cycle — never just "bigger and faster". */
+.cue-glow-blocked.blocked-level-1 {
+  --blocked-min: 0.46;
+  --blocked-max: 0.88;
+  --blocked-floor: 0.62;
+  width: 380px;
+  height: 380px;
+  animation-duration: 3.5s;
+}
+
+.cue-glow-blocked.blocked-level-2 {
+  --blocked-min: 0.62;
+  --blocked-max: 1;
+  --blocked-floor: 0.84;
+  width: 460px;
+  height: 460px;
+  animation-duration: 2.4s;
+}
+
+.cue-glow-blocked.blocked-clearing {
+  animation: none;
+  opacity: 0;
+}
+
+body.eco .cue-glow-blocked,
+body.eco .cue-glow-blocked.blocked-level-1,
+body.eco .cue-glow-blocked.blocked-level-2 {
+  animation: none;
+  opacity: var(--blocked-floor, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cue-glow-blocked,
+  .cue-glow-blocked.blocked-level-1,
+  .cue-glow-blocked.blocked-level-2 {
+    animation: none;
+    opacity: var(--blocked-floor, 0.4);
+  }
+}
+
+/* =========================================
    Cue Text: Kinetic Typography
    ========================================= */
 .cue-text {
