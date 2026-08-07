@@ -67,7 +67,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.11.4",
-    "electron": "^31.3.1",
+    "electron": "^39.8.10",
     "electron-builder": "^26.15.3",
     "eslint": "^10.8.0",
     "globals": "^17.7.0"
