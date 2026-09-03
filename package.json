@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "express": "^4.19.2"
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
